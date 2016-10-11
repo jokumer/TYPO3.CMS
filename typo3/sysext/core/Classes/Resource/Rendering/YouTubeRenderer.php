@@ -97,6 +97,14 @@ class YouTubeRenderer implements FileRendererInterface
             }
         }
 
+        if ($file instanceof FileReference) {
+            $orgFile = $file->getOriginalFile();
+        } else {
+            $orgFile = $file;
+        }
+
+        $videoId = $this->getOnlineMediaHelper($file)->getOnlineMediaId($orgFile);
+
         $urlParams = ['autohide=1'];
         if (!isset($options['controls']) || !empty($options['controls'])) {
             $urlParams[] = 'controls=2';
@@ -105,22 +113,15 @@ class YouTubeRenderer implements FileRendererInterface
             $urlParams[] = 'autoplay=1';
         }
         if (!empty($options['loop'])) {
-            $urlParams[] = 'loop=1';
+            $urlParams[] = 'loop=1&amp;playlist=' . $videoId;
         }
         if (!isset($options['enablejsapi']) || !empty($options['enablejsapi'])) {
-            $urlParams[] = 'enablejsapi=1&amp;origin=' . GeneralUtility::getIndpEnv('TYPO3_REQUEST_URL');
+            $urlParams[] = 'enablejsapi=1&amp;origin=' . GeneralUtility::getIndpEnv('TYPO3_REQUEST_HOST');
         }
         $urlParams[] = 'showinfo=' . (int)!empty($options['showinfo']);
 
-        if ($file instanceof FileReference) {
-            $orgFile = $file->getOriginalFile();
-        } else {
-            $orgFile = $file;
-        }
-
-        $videoId = $this->getOnlineMediaHelper($file)->getOnlineMediaId($orgFile);
         $src = sprintf(
-            '//www.youtube%s.com/embed/%s?%s',
+            'https://www.youtube%s.com/embed/%s?%s',
             !empty($options['no-cookie']) ? '-nocookie' : '',
             $videoId,
             implode('&amp;', $urlParams)

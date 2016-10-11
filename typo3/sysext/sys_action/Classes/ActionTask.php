@@ -227,7 +227,7 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
                 );
 
                 $title = 'title="' . $this->getLanguageService()->getLL('edit-sys_action') . '"';
-                $icon = $this->iconFactory->getIcon('actions-document-open', Icon::SIZE_SMALL)->render();
+                $icon = $this->iconFactory->getIcon('actions-open', Icon::SIZE_SMALL)->render();
                 $editActionLink = '<a class="btn btn-default btn-sm" href="' . $link . '"' . $title . '>';
                 $editActionLink .= $icon . ' ' . $this->getLanguageService()->getLL('edit-sys_action') . '</a>';
             }
@@ -1052,15 +1052,5 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
     protected function getBackendUser()
     {
         return $GLOBALS['BE_USER'];
-    }
-
-    /**
-     * Returns the database connection
-     *
-     * @return \TYPO3\CMS\Core\Database\DatabaseConnection
-     */
-    protected function getDatabaseConnection()
-    {
-        return $GLOBALS['TYPO3_DB'];
     }
 }

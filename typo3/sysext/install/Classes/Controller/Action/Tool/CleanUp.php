@@ -171,7 +171,7 @@ class CleanUp extends Action\AbstractAction
      */
     protected function resetBackendUserUc()
     {
-        $connection = GeneralUtility::makeInstance(ConnectionPool::class)
+        GeneralUtility::makeInstance(ConnectionPool::class)
             ->getQueryBuilderForTable('be_users')
             ->update('be_users')
             ->set('uc', '')
@@ -302,9 +302,6 @@ class CleanUp extends Action\AbstractAction
      */
     protected function clearProcessedFiles()
     {
-        // make the DB available
-        $GLOBALS['TYPO3_DB'] = $this->getDatabaseConnection();
-
         $repository = GeneralUtility::makeInstance(ProcessedFileRepository::class);
         $failedDeletions = $repository->removeAll();
         if ($failedDeletions) {

@@ -14,12 +14,12 @@ namespace TYPO3\CMS\Backend\View;
  * The TYPO3 project - inspiring people to share!
  */
 
+use Doctrine\DBAL\Driver\Statement;
 use TYPO3\CMS\Backend\Controller\Page\LocalizationController;
 use TYPO3\CMS\Backend\Controller\PageLayoutController;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\ConnectionPool;
-use TYPO3\CMS\Core\Database\DatabaseConnection;
 use TYPO3\CMS\Core\Database\Query\QueryHelper;
 use TYPO3\CMS\Core\Database\Query\Restriction\BackendWorkspaceRestriction;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
@@ -409,7 +409,7 @@ class PageLayoutView extends \TYPO3\CMS\Recordlist\RecordList\AbstractDatabaseRe
                         'returnUrl' => GeneralUtility::getIndpEnv('REQUEST_URI')
                     ];
                     $url = BackendUtility::getModuleUrl('record_edit', $urlParameters);
-                    $eI = '<a href="' . htmlspecialchars($url)
+                    $eI = '<a class="btn btn-default" href="' . htmlspecialchars($url)
                         . '" title="' . htmlspecialchars($iTitle) . '">'
                         . $this->iconFactory->getIcon('actions-document-open', Icon::SIZE_SMALL)->render() . '</a>';
                 } else {
@@ -417,9 +417,9 @@ class PageLayoutView extends \TYPO3\CMS\Recordlist\RecordList\AbstractDatabaseRe
                 }
                 switch ($field) {
                     case 'title':
-                        $theData[$field] = '&nbsp;<strong>'
+                        $theData[$field] = '&nbsp;' . $eI . '<strong>'
                             . $lang->sL($GLOBALS['TCA']['pages']['columns'][$field]['label'])
-                            . '</strong>' . $eI;
+                            . '</strong>';
                         break;
                     case 'uid':
                         $theData[$field] = '&nbsp;<strong>ID:</strong>';
@@ -436,9 +436,9 @@ class PageLayoutView extends \TYPO3\CMS\Recordlist\RecordList\AbstractDatabaseRe
                                     '</span>';
                             }
                         } else {
-                            $theData[$field] = '&nbsp;&nbsp;<strong>'
+                            $theData[$field] = '&nbsp;&nbsp;' . $eI . '<strong>'
                                 . htmlspecialchars($lang->sL($GLOBALS['TCA']['pages']['columns'][$field]['label']))
-                                . '</strong>' . $eI;
+                                . '</strong>';
                         }
                 }
             }
@@ -862,7 +862,6 @@ class PageLayoutView extends \TYPO3\CMS\Recordlist\RecordList\AbstractDatabaseRe
                 if ($lP) {
                     list($lpRecord) = BackendUtility::getRecordsByField('pages_language_overlay', 'pid', $id, 'AND sys_language_uid=' . $lP);
                     BackendUtility::workspaceOL('pages_language_overlay', $lpRecord);
-                    $params = '&edit[pages_language_overlay][' . $lpRecord['uid'] . ']=edit&overrideVals[pages_language_overlay][sys_language_uid]=' . $lP;
                     $recordIcon = BackendUtility::wrapClickMenuOnIcon(
                         $this->iconFactory->getIconForRecord('pages_language_overlay', $lpRecord, Icon::SIZE_SMALL)->render(),
                         'pages_language_overlay',
@@ -1059,9 +1058,9 @@ class PageLayoutView extends \TYPO3\CMS\Recordlist\RecordList\AbstractDatabaseRe
                             'returnUrl' => GeneralUtility::getIndpEnv('REQUEST_URI')
                         ];
                         $url = BackendUtility::getModuleUrl('record_edit', $urlParameters);
-                        $Nrow['__editIconLink__'] = '<a href="' . htmlspecialchars($url)
+                        $Nrow['__editIconLink__'] = '<a class="btn btn-default" href="' . htmlspecialchars($url)
                             . '" title="' . htmlspecialchars($this->getLanguageService()->getLL('edit')) . '">'
-                            . $this->iconFactory->getIcon('actions-document-open', Icon::SIZE_SMALL)->render() . '</a>';
+                            . $this->iconFactory->getIcon('actions-open', Icon::SIZE_SMALL)->render() . '</a>';
                     } else {
                         $Nrow['__editIconLink__'] = $this->noEditIcon();
                     }
@@ -1370,13 +1369,13 @@ class PageLayoutView extends \TYPO3\CMS\Recordlist\RecordList\AbstractDatabaseRe
                             'returnUrl' => GeneralUtility::getIndpEnv('REQUEST_URI')
                         ];
                         $url = BackendUtility::getModuleUrl('record_edit', $urlParameters);
-                        $eI = '<a href="' . htmlspecialchars($url)
+                        $eI = '<a class="btn btn-default" href="' . htmlspecialchars($url)
                             . '" title="' . htmlspecialchars($this->getLanguageService()->getLL('editThisPage')) . '">'
-                            . $this->iconFactory->getIcon('actions-document-open', Icon::SIZE_SMALL)->render() . '</a>';
+                            . $this->iconFactory->getIcon('actions-page-open', Icon::SIZE_SMALL)->render() . '</a>';
                     } else {
                         $eI = '';
                     }
-                    $theData[$field] = '<span align="right">' . $row['uid'] . $eI . '</span>';
+                    $theData[$field] = $eI . '<span align="right">' . $row['uid'] . '</span>';
                     break;
                 case 'shortcut':
                 case 'shortcut_mode':
@@ -1542,7 +1541,7 @@ class PageLayoutView extends \TYPO3\CMS\Recordlist\RecordList\AbstractDatabaseRe
                     . '" title="' . htmlspecialchars($this->nextThree > 1
                         ? sprintf($this->getLanguageService()->getLL('nextThree'), $this->nextThree)
                         : $this->getLanguageService()->getLL('edit'))
-                    . '">' . $this->iconFactory->getIcon('actions-document-open', Icon::SIZE_SMALL)->render() . '</a>';
+                    . '">' . $this->iconFactory->getIcon('actions-open', Icon::SIZE_SMALL)->render() . '</a>';
                 // Hide element:
                 $hiddenField = $GLOBALS['TCA']['tt_content']['ctrl']['enablecolumns']['disabled'];
                 if ($hiddenField && $GLOBALS['TCA']['tt_content']['columns'][$hiddenField]
@@ -1563,21 +1562,25 @@ class PageLayoutView extends \TYPO3\CMS\Recordlist\RecordList\AbstractDatabaseRe
                         . $this->iconFactory->getIcon('actions-edit-' . strtolower($label), Icon::SIZE_SMALL)->render() . '</a>';
                 }
                 // Delete
-                $params = '&cmd[tt_content][' . $row['uid'] . '][delete]=1';
-                $confirm = $this->getLanguageService()->getLL('deleteWarning')
-                    . BackendUtility::translationCount('tt_content', $row['uid'], (' '
-                    . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_core.xlf:labels.translationsOfRecord')));
-                $out .= '<a class="btn btn-default t3js-modal-trigger" href="' . htmlspecialchars(BackendUtility::getLinkToDataHandlerAction($params)) . '"'
-                    . ' data-severity="warning"'
-                    . ' data-title="' . htmlspecialchars($this->getLanguageService()->sL('LLL:EXT:lang/locallang_alt_doc.xlf:label.confirm.delete_record.title')) . '"'
-                    . ' data-content="' . htmlspecialchars($confirm) . '" '
-                    . ' data-button-close-text="' . htmlspecialchars($this->getLanguageService()->sL('LLL:EXT:lang/locallang_common.xlf:cancel')) . '"'
-                    . ' title="' . htmlspecialchars($this->getLanguageService()->getLL('deleteItem')) . '">'
-                    . $this->iconFactory->getIcon('actions-edit-delete', Icon::SIZE_SMALL)->render() . '</a>';
-                if ($out && $this->getBackendUser()->doesUserHaveAccess($this->pageinfo, Permission::CONTENT_EDIT)) {
-                    $out = '<div class="btn-group btn-group-sm" role="group">' . $out . '</div>';
-                } else {
-                    $out = '';
+                $disableDeleteTS = $this->getBackendUser()->getTSConfig('options.disableDelete');
+                $disableDelete = (bool) trim(isset($disableDeleteTS['properties']['tt_content']) ? $disableDeleteTS['properties']['tt_content'] : $disableDeleteTS['value']);
+                if (!$disableDelete) {
+                    $params = '&cmd[tt_content][' . $row['uid'] . '][delete]=1';
+                    $confirm = $this->getLanguageService()->getLL('deleteWarning')
+                        . BackendUtility::translationCount('tt_content', $row['uid'], (' '
+                                                                                       . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_core.xlf:labels.translationsOfRecord')));
+                    $out .= '<a class="btn btn-default t3js-modal-trigger" href="' . htmlspecialchars(BackendUtility::getLinkToDataHandlerAction($params)) . '"'
+                        . ' data-severity="warning"'
+                        . ' data-title="' . htmlspecialchars($this->getLanguageService()->sL('LLL:EXT:lang/locallang_alt_doc.xlf:label.confirm.delete_record.title')) . '"'
+                        . ' data-content="' . htmlspecialchars($confirm) . '" '
+                        . ' data-button-close-text="' . htmlspecialchars($this->getLanguageService()->sL('LLL:EXT:lang/locallang_common.xlf:cancel')) . '"'
+                        . ' title="' . htmlspecialchars($this->getLanguageService()->getLL('deleteItem')) . '">'
+                        . $this->iconFactory->getIcon('actions-edit-delete', Icon::SIZE_SMALL)->render() . '</a>';
+                    if ($out && $this->getBackendUser()->doesUserHaveAccess($this->pageinfo, Permission::CONTENT_EDIT)) {
+                        $out = '<div class="btn-group btn-group-sm" role="group">' . $out . '</div>';
+                    } else {
+                        $out = '';
+                    }
                 }
                 if (!$disableMoveAndNewButtons) {
                     $moveButtonContent = '';
@@ -2149,15 +2152,18 @@ class PageLayoutView extends \TYPO3\CMS\Recordlist\RecordList\AbstractDatabaseRe
     /**
      * Traverse the result pointer given, adding each record to array and setting some internal values at the same time.
      *
-     * @param \Doctrine\DBAL\Driver\Statement $result MySQLi result object / DBAL object
+     * @param Statement|\mysqli_result $result DBAL Statement or MySQLi result object
      * @param string $table Table name defaulting to tt_content
      * @return array The selected rows returned in this array.
      */
-    public function getResult(\Doctrine\DBAL\Driver\Statement $result, string $table = 'tt_content'): array
+    public function getResult($result, string $table = 'tt_content'): array
     {
+        if ($result instanceof \mysqli_result) {
+            GeneralUtility::deprecationLog('Using \TYPO3\CMS\Backend\View\PageLayoutView::getResult with a mysqli_result object is deprecated since TYPO3 CMS 8 and will be removed in TYPO3 CMS 9');
+        }
         $output = [];
         // Traverse the result:
-        while ($row = $result->fetch()) {
+        while ($row = ($result instanceof Statement ? $result->fetch() : $result->fetch_assoc())) {
             BackendUtility::workspaceOL($table, $row, -99, true);
             if ($row) {
                 // Add the row to the array:
@@ -2538,14 +2544,6 @@ class PageLayoutView extends \TYPO3\CMS\Recordlist\RecordList\AbstractDatabaseRe
     protected function getBackendUser()
     {
         return $GLOBALS['BE_USER'];
-    }
-
-    /**
-     * @return DatabaseConnection
-     */
-    protected function getDatabase()
-    {
-        return $GLOBALS['TYPO3_DB'];
     }
 
     /**

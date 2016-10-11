@@ -106,6 +106,7 @@ class SchedulerModuleController extends \TYPO3\CMS\Backend\Module\BaseScriptClas
         $this->backendTemplatePath = ExtensionManagementUtility::extPath('scheduler') . 'Resources/Private/Templates/Backend/SchedulerModule/';
         $this->view = GeneralUtility::makeInstance(\TYPO3\CMS\Fluid\View\StandaloneView::class);
         $this->view->getRequest()->setControllerExtensionName('scheduler');
+        $this->view->setPartialRootPaths([ExtensionManagementUtility::extPath('scheduler') . 'Resources/Private/Partials/Backend/SchedulerModule/']);
         $this->moduleUri = BackendUtility::getModuleUrl($this->moduleName);
 
         $pageRenderer = GeneralUtility::makeInstance(PageRenderer::class);
@@ -472,6 +473,7 @@ class SchedulerModuleController extends \TYPO3\CMS\Backend\Module\BaseScriptClas
         }
         $this->view->assign('isExecutableMessage', $message);
         $this->view->assign('isExecutableSeverity', $severity);
+        $this->view->assign('now', $this->getServerTime());
 
         return $this->view->render();
     }
@@ -886,10 +888,7 @@ class SchedulerModuleController extends \TYPO3\CMS\Backend\Module\BaseScriptClas
         }
 
         $this->view->assign('table', implode(LF, $table));
-
-        // Server date time
-        $dateFormat = $GLOBALS['TYPO3_CONF_VARS']['SYS']['ddmmyy'] . ' ' . $GLOBALS['TYPO3_CONF_VARS']['SYS']['hhmm'] . ' T (e';
-        $this->view->assign('now', date($dateFormat) . ', GMT ' . date('P') . ')');
+        $this->view->assign('now', $this->getServerTime());
 
         return $this->view->render();
     }
@@ -1007,7 +1006,7 @@ class SchedulerModuleController extends \TYPO3\CMS\Backend\Module\BaseScriptClas
         // Header row
         $table[] =
             '<thead><tr>'
-                . '<th><a href="#" id="checkall" title="' . htmlspecialchars($this->getLanguageService()->getLL('label.checkAll')) . '" class="icon">' . $this->moduleTemplate->getIconFactory()->getIcon('actions-document-select', Icon::SIZE_SMALL)->render() . '</a></th>'
+                . '<th><a class="btn btn-default" href="#" id="checkall" title="' . htmlspecialchars($this->getLanguageService()->getLL('label.checkAll')) . '" class="icon">' . $this->moduleTemplate->getIconFactory()->getIcon('actions-document-select', Icon::SIZE_SMALL)->render() . '</a></th>'
                 . '<th>' . htmlspecialchars($this->getLanguageService()->getLL('label.id')) . '</th>'
                 . '<th>' . htmlspecialchars($this->getLanguageService()->getLL('task')) . '</th>'
                 . '<th>' . htmlspecialchars($this->getLanguageService()->getLL('label.type')) . '</th>'
@@ -1032,7 +1031,7 @@ class SchedulerModuleController extends \TYPO3\CMS\Backend\Module\BaseScriptClas
                 // Define action icons
                 $link = htmlspecialchars($this->moduleUri . '&CMD=edit&tx_scheduler[uid]=' . $schedulerRecord['uid']);
                 $editAction = '<a class="btn btn-default" href="' . $link . '" title="' . htmlspecialchars($this->getLanguageService()->sL('LLL:EXT:lang/locallang_common.xlf:edit')) . '" class="icon">' .
-                    $this->moduleTemplate->getIconFactory()->getIcon('actions-document-open', Icon::SIZE_SMALL)->render() . '</a>';
+                    $this->moduleTemplate->getIconFactory()->getIcon('actions-open', Icon::SIZE_SMALL)->render() . '</a>';
                 if ((int)$schedulerRecord['disable'] === 1) {
                     $translationKey = 'enable';
                     $icon = $this->moduleTemplate->getIconFactory()->getIcon('actions-edit-unhide', Icon::SIZE_SMALL);
@@ -1143,7 +1142,7 @@ class SchedulerModuleController extends \TYPO3\CMS\Backend\Module\BaseScriptClas
                     // Define checkbox
                     $startExecutionElement = '<label class="btn btn-default btn-checkbox"><input type="checkbox" name="tx_scheduler[execute][]" value="' . $schedulerRecord['uid'] . '" id="task_' . $schedulerRecord['uid'] . '"><span class="t3-icon fa"></span></label>';
 
-                    $actions = $editAction . $toggleHiddenAction . $deleteAction;
+                    $actions = '<div class="btn btn-group" role="group">' . $editAction . $toggleHiddenAction . $deleteAction . '</div>';
 
                     // Check the disable status
                     // Row is shown dimmed if task is disabled, unless it is still running
@@ -1157,9 +1156,9 @@ class SchedulerModuleController extends \TYPO3\CMS\Backend\Module\BaseScriptClas
 
                     // Show no action links (edit, delete) if task is running
                     if ($isRunning) {
-                        $actions = $stopAction;
+                        $actions = '<div class="btn btn-group" role="group">' . $stopAction . '</div>';
                     } else {
-                        $actions .= $runAction;
+                        $actions .= '<div class="btn btn-group" role="group">' . $runAction . '</div>';
                     }
 
                     // Check if the last run failed
@@ -1197,7 +1196,7 @@ class SchedulerModuleController extends \TYPO3\CMS\Backend\Module\BaseScriptClas
                             . '<td>' . $multiple . '</td>'
                             . '<td>' . $lastExecution . '</td>'
                             . '<td>' . $nextDate . '</td>'
-                            . '<td nowrap="nowrap"><div class="btn-group" role="group">' . $actions . '</div></td>'
+                            . '<td nowrap="nowrap">' . $actions . '</td>'
                         . '</tr>';
                 } else {
                     // The task object is not valid
@@ -1225,10 +1224,7 @@ class SchedulerModuleController extends \TYPO3\CMS\Backend\Module\BaseScriptClas
         }
 
         $this->view->assign('table', '<table class="table table-striped table-hover">' . implode(LF, $table) . '</table>');
-
-        // Server date time
-        $dateFormat = $GLOBALS['TYPO3_CONF_VARS']['SYS']['ddmmyy'] . ' ' . $GLOBALS['TYPO3_CONF_VARS']['SYS']['hhmm'] . ' T (e';
-        $this->view->assign('now', date($dateFormat) . ', GMT ' . date('P') . ')');
+        $this->view->assign('now', $this->getServerTime());
 
         return $this->view->render();
     }
@@ -1602,6 +1598,15 @@ class SchedulerModuleController extends \TYPO3\CMS\Backend\Module\BaseScriptClas
             ->setDisplayName($this->MOD_MENU['function'][$this->MOD_SETTINGS['function']])
             ->setSetVariables(['function']);
         $buttonBar->addButton($shortcutButton);
+    }
+
+    /**
+     * @return string
+     */
+    protected function getServerTime()
+    {
+        $dateFormat = $GLOBALS['TYPO3_CONF_VARS']['SYS']['ddmmyy'] . ' ' . $GLOBALS['TYPO3_CONF_VARS']['SYS']['hhmm'] . ' T (e';
+        return date($dateFormat) . ', GMT ' . date('P') . ')';
     }
 
     /**

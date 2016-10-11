@@ -833,6 +833,11 @@ return [
                 'maxitems' => 999,
                 'minitems' => 0,
                 'size' => 5,
+                'wizards' => [
+                    'suggest' => [
+                        'type' => 'suggest'
+                    ]
+                ]
             ]
         ],
         'media' => [
@@ -959,11 +964,6 @@ return [
                 'search' => [
                     'andWhere' => 'CType=\'list\''
                 ]
-            ]
-        ],
-        'tx_impexp_origuid' => [
-            'config' => [
-                'type' => 'passthrough'
             ]
         ],
         'accessibility_title' => [

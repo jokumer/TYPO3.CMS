@@ -317,6 +317,28 @@ class ExpressionBuilder
                     1459696681
                 );
                 break;
+            case 'sqlite':
+            case 'sqlite3':
+            case 'pdo_sqlite':
+                if (strpos($value, ':') === 0 || $value === '?') {
+                    throw new \InvalidArgumentException(
+                        'ExpressionBuilder::inSet() for SQLite can not be used with placeholder arguments.',
+                        1476029421
+                    );
+                }
+
+                return $this->comparison(
+                    implode('||', [
+                        $this->literal(','),
+                        $this->connection->quoteIdentifier($fieldName),
+                        $this->literal(','),
+                    ]),
+                    'LIKE',
+                    $this->literal(
+                        '%,' . $this->unquoteLiteral($value) . ',%'
+                    )
+                );
+                break;
             default:
                 return sprintf(
                     'FIND_IN_SET(%s, %s)',
@@ -446,5 +468,26 @@ class ExpressionBuilder
     public function literal($input, string $type = null): string
     {
         return $this->connection->quote($input, $type);
+    }
+
+    /**
+     * Unquote a string literal. Used to unquote values for internal platform adjustments.
+     *
+     * @param string $value The value to be unquoted
+     * @return string The unquoted value
+     */
+    protected function unquoteLiteral(string $value): string
+    {
+        $quoteChar = $this->connection
+            ->getDatabasePlatform()
+            ->getStringLiteralQuoteCharacter();
+
+        $isQuoted = strpos($value, $quoteChar) === 0 && strpos(strrev($value), $quoteChar) === 0;
+
+        if ($isQuoted) {
+            return str_replace($quoteChar . $quoteChar, $quoteChar, substr($value, 1, -1));
+        }
+
+        return $value;
     }
 }

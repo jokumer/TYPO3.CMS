@@ -40,6 +40,7 @@ use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\HttpUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
+use TYPO3\CMS\Core\Utility\PathUtility;
 use TYPO3\CMS\Extbase\SignalSlot\Dispatcher;
 use TYPO3\CMS\Frontend\Page\PageRepository;
 
@@ -980,7 +981,7 @@ class EditDocumentController extends AbstractModule
                     $this->viewId,
                     'mod.xMOD_alt_doc'
                 ) : [];
-                $body = $this->formResultCompiler->JStop();
+                $body = $this->formResultCompiler->addCssFiles();
                 $body .= $this->compileForm($editForm);
                 $body .= $this->formResultCompiler->printNeededJSFunctions();
                 $body .= '</form>';
@@ -1146,7 +1147,7 @@ class EditDocumentController extends AbstractModule
                                 $formResult['doSaveFieldName'] = 'doSave';
 
                                 // @todo: Put all the stuff into FormEngine as final "compiler" class
-                                // @todo: This is done here for now to not rewrite JStop()
+                                // @todo: This is done here for now to not rewrite addCssFiles()
                                 // @todo: and printNeededJSFunctions() now
                                 $this->formResultCompiler->mergeResult($formResult);
 
@@ -1412,7 +1413,7 @@ class EditDocumentController extends AbstractModule
                         ->setHref($this->R_URI . '&columnsOnly=')
                         ->setTitle($lang->getLL('editWholeRecord'))
                         ->setIcon($this->moduleTemplate->getIconFactory()->getIcon(
-                            'actions-document-open',
+                            'actions-open',
                             Icon::SIZE_SMALL
                         ));
                     $buttonBar->addButton($columnsOnlyButton, ButtonBar::BUTTON_POSITION_LEFT, 3);
@@ -1466,7 +1467,7 @@ class EditDocumentController extends AbstractModule
      */
     public function shortCutLink()
     {
-        if ($this->returnUrl !== ExtensionManagementUtility::extRelPath('backend') . 'Resources/Private/Templates/Close.html') {
+        if ($this->returnUrl !== ExtensionManagementUtility::siteRelPath('backend') . 'Resources/Private/Templates/Close.html') {
             $shortCutButton = $this->moduleTemplate->getDocHeaderComponent()->getButtonBar()->makeShortcutButton();
             $shortCutButton->setModuleName($this->MCONF['name'])
                 ->setGetVariables([
@@ -1486,10 +1487,10 @@ class EditDocumentController extends AbstractModule
      */
     public function openInNewWindowLink()
     {
-        $backendRelPath = ExtensionManagementUtility::extRelPath('backend');
-        if ($this->returnUrl !== $backendRelPath . 'Resources/Private/Templates/Close.html') {
+        $closeUrl = ExtensionManagementUtility::siteRelPath('backend') . 'Resources/Private/Templates/Close.html';
+        if ($this->returnUrl !== $closeUrl) {
             $aOnClick = 'vHWin=window.open(' . GeneralUtility::quoteJSvalue(GeneralUtility::linkThisScript(
-                ['returnUrl' => $backendRelPath . 'Resources/Private/Templates/Close.html']
+                ['returnUrl' => PathUtility::getAbsoluteWebPath($closeUrl)]
             ))
                 . ','
                 . GeneralUtility::quoteJSvalue(md5($this->R_URI))

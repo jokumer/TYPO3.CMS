@@ -292,7 +292,9 @@ class ClickMenu
 
             // Delete:
             $elInfo = [GeneralUtility::fixed_lgd_cs(BackendUtility::getRecordTitle($table, $this->rec), $this->backendUser->uc['titleLen'])];
-            if (!in_array('delete', $this->disabledItems, true) && !$root && !$DBmount && $this->backendUser->isPSet($lCP, $table, 'delete')) {
+            $disableDeleteTS = $this->backendUser->getTSConfig('options.disableDelete');
+            $disableDelete = (bool) trim(isset($disableDeleteTS['properties'][$table]) ? $disableDeleteTS['properties'][$table] : $disableDeleteTS['value']);
+            if (!in_array('delete', $this->disabledItems, true) && !$root && !$DBmount && $this->backendUser->isPSet($lCP, $table, 'delete') && !$disableDelete) {
                 $menuItems['spacer2'] = 'spacer';
                 $menuItems['delete'] = $this->DB_delete($table, $uid, $elInfo);
             }
@@ -753,7 +755,11 @@ class ClickMenu
         $newPageModule = trim($this->backendUser->getTSConfigVal('options.overridePageModule'));
         $pageModule = BackendUtility::isModuleSetInTBE_MODULES($newPageModule) ? $newPageModule : 'web_layout';
         $loc = 'top.content.list_frame';
-        $theIcon = $this->iconFactory->getIcon('actions-document-open', Icon::SIZE_SMALL)->render();
+        $iconName = 'actions-open';
+        if ($table === 'pages') {
+            $iconName = 'actions-page-open';
+        }
+        $theIcon = $this->iconFactory->getIcon($iconName, Icon::SIZE_SMALL)->render();
 
         $link = BackendUtility::getModuleUrl('record_edit', [
             'edit[' . $table . '][' . $uid . ']' => 'edit'

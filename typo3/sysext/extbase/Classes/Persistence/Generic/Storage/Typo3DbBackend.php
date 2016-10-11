@@ -33,13 +33,6 @@ use TYPO3\CMS\Extbase\Persistence\QueryInterface;
 class Typo3DbBackend implements BackendInterface, SingletonInterface
 {
     /**
-     * The TYPO3 database object
-     *
-     * @var \TYPO3\CMS\Core\Database\DatabaseConnection
-     */
-    protected $databaseHandle;
-
-    /**
      * @var ConnectionPool
      */
     protected $connectionPool;
@@ -79,9 +72,9 @@ class Typo3DbBackend implements BackendInterface, SingletonInterface
     protected $environmentService;
 
     /**
-     * @var \TYPO3\CMS\Extbase\Persistence\Generic\Storage\Typo3DbQueryParser
+     * @var \TYPO3\CMS\Extbase\Object\ObjectManagerInterface
      */
-    protected $queryParser;
+    protected $objectManager;
 
     /**
      * @param \TYPO3\CMS\Extbase\Persistence\Generic\Mapper\DataMapper $dataMapper
@@ -116,11 +109,11 @@ class Typo3DbBackend implements BackendInterface, SingletonInterface
     }
 
     /**
-     * @param \TYPO3\CMS\Extbase\Persistence\Generic\Storage\Typo3DbQueryParser $queryParser
+     * @param \TYPO3\CMS\Extbase\Object\ObjectManagerInterface $objectManager
      */
-    public function injectQueryParser(\TYPO3\CMS\Extbase\Persistence\Generic\Storage\Typo3DbQueryParser $queryParser)
+    public function injectObjectManager(\TYPO3\CMS\Extbase\Object\ObjectManagerInterface $objectManager)
     {
-        $this->queryParser = $queryParser;
+        $this->objectManager = $objectManager;
     }
 
     /**
@@ -128,7 +121,6 @@ class Typo3DbBackend implements BackendInterface, SingletonInterface
      */
     public function __construct()
     {
-        $this->databaseHandle = $GLOBALS['TYPO3_DB'];
         $this->connectionPool = GeneralUtility::makeInstance(ConnectionPool::class);
     }
 
@@ -174,7 +166,7 @@ class Typo3DbBackend implements BackendInterface, SingletonInterface
     public function updateRow($tableName, array $fieldValues, $isRelation = false)
     {
         if (!isset($fieldValues['uid'])) {
-            throw new \InvalidArgumentException('The given row must contain a value for "uid".');
+            throw new \InvalidArgumentException('The given row must contain a value for "uid".', 1476045164);
         }
 
         $uid = (int)$fieldValues['uid'];
@@ -330,6 +322,7 @@ class Typo3DbBackend implements BackendInterface, SingletonInterface
      *
      * @param QueryInterface $query
      * @return array
+     * @throws SqlErrorException
      */
     public function getObjectDataByQuery(QueryInterface $query)
     {
@@ -337,63 +330,22 @@ class Typo3DbBackend implements BackendInterface, SingletonInterface
         if ($statement instanceof Qom\Statement) {
             $rows = $this->getObjectDataByRawQuery($statement);
         } else {
-            $statementParts = $this->queryParser->parseQuery($query);
-            $rows = $this->getRowsFromDatabase($statementParts);
+            $queryBuilder = $this->objectManager->get(Typo3DbQueryParser::class)
+                    ->convertQueryToDoctrineQueryBuilder($query);
+            if ($query->getOffset()) {
+                $queryBuilder->setFirstResult($query->getOffset());
+            }
+            if ($query->getLimit()) {
+                $queryBuilder->setMaxResults($query->getLimit());
+            }
+            try {
+                $rows = $queryBuilder->execute()->fetchAll();
+            } catch (DBALException $e) {
+                throw new SqlErrorException($e->getPrevious()->getMessage(), 1472074485);
+            }
         }
 
         $rows = $this->doLanguageAndWorkspaceOverlay($query->getSource(), $rows, $query->getQuerySettings());
-        return $rows;
-    }
-
-    /**
-     * Creates the parameters for the query methods of the database methods in the TYPO3 core, from an array
-     * that came from a parsed query.
-     *
-     * @param array $statementParts
-     * @throws \InvalidArgumentException
-     * @return array
-     */
-    protected function createQueryCommandParametersFromStatementParts(array $statementParts)
-    {
-        if (isset($statementParts['offset']) && !isset($statementParts['limit'])) {
-            throw new \InvalidArgumentException(
-                'Trying to make query with offset and no limit, the offset would become a limit. You have to set a limit to use offset. To retrieve all rows from a certain offset up to the end of the result set, you can use some large number for the limit.',
-                1465223252
-            );
-        }
-        return [
-            'selectFields' => implode(' ', $statementParts['keywords']) . ' ' . implode(',', $statementParts['fields']),
-            'fromTable'    => implode(' ', $statementParts['tables']) . ' ' . implode(' ', $statementParts['unions']),
-            'whereClause'  => (!empty($statementParts['where']) ? implode('', $statementParts['where']) : '1=1')
-                . (!empty($statementParts['additionalWhereClause'])
-                    ? ' AND ' . implode(' AND ', $statementParts['additionalWhereClause'])
-                    : ''
-            ),
-            'orderBy'      => (!empty($statementParts['orderings']) ? implode(', ', $statementParts['orderings']) : ''),
-            'limit'        => ($statementParts['offset'] ? $statementParts['offset'] . ', ' : '')
-                . ($statementParts['limit'] ? $statementParts['limit'] : '')
-        ];
-    }
-
-    /**
-     * Fetches the rows directly from the database, not using prepared statement
-     *
-     * @param array $statementParts
-     * @return array the result
-     */
-    protected function getRowsFromDatabase(array $statementParts)
-    {
-        $queryCommandParameters = $this->createQueryCommandParametersFromStatementParts($statementParts);
-        $rows = $this->databaseHandle->exec_SELECTgetRows(
-            $queryCommandParameters['selectFields'],
-            $queryCommandParameters['fromTable'],
-            $queryCommandParameters['whereClause'],
-            '',
-            $queryCommandParameters['orderBy'],
-            $queryCommandParameters['limit']
-        );
-        $this->checkSqlErrors();
-
         return $rows;
     }
 
@@ -442,6 +394,7 @@ class Typo3DbBackend implements BackendInterface, SingletonInterface
      * @param QueryInterface $query
      * @throws Exception\BadConstraintException
      * @return int The number of matching tuples
+     * @throws SqlErrorException
      */
     public function getObjectCountByQuery(QueryInterface $query)
     {
@@ -449,29 +402,19 @@ class Typo3DbBackend implements BackendInterface, SingletonInterface
             throw new \TYPO3\CMS\Extbase\Persistence\Generic\Storage\Exception\BadConstraintException('Could not execute count on queries with a constraint of type TYPO3\\CMS\\Extbase\\Persistence\\Generic\\Qom\\Statement', 1256661045);
         }
 
-        $statementParts = $this->queryParser->parseQuery($query);
-
-        $fields = '*';
-        if (isset($statementParts['keywords']['distinct'])) {
-            $fields = 'DISTINCT ' . reset($statementParts['tables']) . '.uid';
+        $queryBuilder = $this->objectManager->get(Typo3DbQueryParser::class)
+                ->convertQueryToDoctrineQueryBuilder($query);
+        try {
+            $count = $queryBuilder->count('*')->execute()->fetchColumn(0);
+        } catch (DBALException $e) {
+            throw new SqlErrorException($e->getPrevious()->getMessage(), 1472074379);
         }
-
-        $queryCommandParameters = $this->createQueryCommandParametersFromStatementParts($statementParts);
-        $count = $this->databaseHandle->exec_SELECTcountRows(
-            $fields,
-            $queryCommandParameters['fromTable'],
-            $queryCommandParameters['whereClause']
-        );
-        $this->checkSqlErrors();
-
-        if ($statementParts['offset']) {
-            $count -= $statementParts['offset'];
+        if ($query->getOffset()) {
+            $count -= $query->getOffset();
         }
-
-        if ($statementParts['limit']) {
-            $count = min($count, $statementParts['limit']);
+        if ($query->getLimit()) {
+            $count = min($count, $query->getLimit());
         }
-
         return (int)max(0, $count);
     }
 
@@ -565,12 +508,19 @@ class Typo3DbBackend implements BackendInterface, SingletonInterface
             && BackendUtility::isTableWorkspaceEnabled($tableName)
             && count($rows) === 1
         ) {
-            $movePlaceholder = $this->databaseHandle->exec_SELECTgetSingleRow(
-                $tableName . '.*',
-                $tableName,
-                't3ver_state=3 AND t3ver_wsid=' . $pageRepository->versioningWorkspaceId
-                    . ' AND t3ver_move_id=' . $rows[0]['uid']
-            );
+            $versionId = $pageRepository->versioningWorkspaceId;
+            $queryBuilder = $this->connectionPool->getQueryBuilderForTable($tableName);
+            $queryBuilder->getRestrictions()->removeAll();
+            $movePlaceholder = $queryBuilder->select($tableName . '.*')
+                ->from($tableName)
+                ->where(
+                    $queryBuilder->expr()->eq('t3ver_state', $queryBuilder->createNamedParameter(3, \PDO::PARAM_INT)),
+                    $queryBuilder->expr()->eq('t3ver_wsid', $queryBuilder->createNamedParameter($versionId, \PDO::PARAM_INT)),
+                    $queryBuilder->expr()->eq('t3ver_move_id', $queryBuilder->createNamedParameter($rows[0]['uid'], \PDO::PARAM_INT))
+                )
+                ->setMaxResults(1)
+                ->execute()
+                ->fetch();
             if (!empty($movePlaceholder)) {
                 $rows = [$movePlaceholder];
             }
@@ -587,12 +537,25 @@ class Typo3DbBackend implements BackendInterface, SingletonInterface
                 if (isset($row[$GLOBALS['TCA'][$tableName]['ctrl']['transOrigPointerField']])
                     && $row[$GLOBALS['TCA'][$tableName]['ctrl']['transOrigPointerField']] > 0
                 ) {
-                    $row = $this->databaseHandle->exec_SELECTgetSingleRow(
-                        $tableName . '.*',
-                        $tableName,
-                        $tableName . '.uid=' . (int)$row[$GLOBALS['TCA'][$tableName]['ctrl']['transOrigPointerField']] .
-                            ' AND ' . $tableName . '.' . $GLOBALS['TCA'][$tableName]['ctrl']['languageField'] . '=0'
-                    );
+                    $queryBuilder = $this->connectionPool->getQueryBuilderForTable($tableName);
+                    $queryBuilder->getRestrictions()->removeAll();
+                    $row = $queryBuilder->select($tableName . '.*')
+                        ->from($tableName)
+                        ->where(
+                            $queryBuilder->expr()->eq(
+                                $tableName . '.uid',
+                                $queryBuilder->createNamedParameter(
+                                    $row[$GLOBALS['TCA'][$tableName]['ctrl']['transOrigPointerField']], \PDO::PARAM_INT
+                                )
+                            ),
+                            $queryBuilder->expr()->eq(
+                                $tableName . '.' . $GLOBALS['TCA'][$tableName]['ctrl']['languageField'],
+                                $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT)
+                            )
+                        )
+                        ->setMaxResults(1)
+                        ->execute()
+                        ->fetch();
                 }
             }
             $pageRepository->versionOL($tableName, $row, true);
@@ -628,22 +591,6 @@ class Typo3DbBackend implements BackendInterface, SingletonInterface
         }
 
         return $this->pageRepository;
-    }
-
-    /**
-     * Checks if there are SQL errors in the last query, and if yes, throw an exception.
-     *
-     * @return void
-     * @param string $sql The SQL statement
-     * @throws SqlErrorException
-     */
-    protected function checkSqlErrors($sql = '')
-    {
-        $error = $this->databaseHandle->sql_error();
-        if ($error !== '') {
-            $error .= $sql ? ': ' . $sql : '';
-            throw new SqlErrorException($error, 1247602160);
-        }
     }
 
     /**

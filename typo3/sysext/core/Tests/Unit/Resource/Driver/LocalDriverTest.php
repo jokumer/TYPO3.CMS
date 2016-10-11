@@ -638,7 +638,7 @@ class LocalDriverTest extends \TYPO3\CMS\Core\Tests\Unit\Resource\BaseTestCase
         $subFolder = vfsStream::newDirectory('fileadmin');
         $root->addChild($subFolder);
         // Load fixture files and folders from disk
-        $directory = vfsStream::copyFromFileSystem(__DIR__ . '/Fixtures/', $subFolder, 1024*1024);
+        vfsStream::copyFromFileSystem(__DIR__ . '/Fixtures/', $subFolder, 1024*1024);
         FileStreamWrapper::init(PATH_site);
         FileStreamWrapper::registerOverlayPath('fileadmin/', 'vfs://root/fileadmin/', false);
 
@@ -1297,7 +1297,11 @@ class LocalDriverTest extends \TYPO3\CMS\Core\Tests\Unit\Resource\BaseTestCase
             ]
         ]);
         $subject = $this->createDriver([], ['createIdentifierMap']);
-        $subject->expects($this->atLeastOnce())->method('createIdentifierMap')->will($this->throwException(new \TYPO3\CMS\Core\Resource\Exception\FileOperationErrorException()));
+        $subject->expects($this->atLeastOnce())->method('createIdentifierMap')->will(
+            $this->throwException(
+                new \TYPO3\CMS\Core\Resource\Exception\FileOperationErrorException('testing', 1476045666)
+            )
+        );
         $subject->renameFolder('/sourceFolder/', 'newFolder');
         $this->assertFileExists($this->getUrlInMount('/sourceFolder/file'));
     }

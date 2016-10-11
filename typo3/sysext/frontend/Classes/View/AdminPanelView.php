@@ -702,7 +702,7 @@ class AdminPanelView
                 . '</a>';
         }
         if ($perms & Permission::PAGE_EDIT) {
-            $icon = $this->iconFactory->getIcon('actions-document-open', Icon::SIZE_SMALL)->render();
+            $icon = $this->iconFactory->getIcon('actions-page-open', Icon::SIZE_SMALL)->render();
             $url = BackendUtility::getModuleUrl('record_edit', [
                 'edit[pages][' . $id . ']' => 'edit',
                 'noView' => 1,
@@ -787,16 +787,6 @@ class AdminPanelView
     protected function getBackendUser()
     {
         return $GLOBALS['BE_USER'];
-    }
-
-    /**
-     * Returns the database connection
-     *
-     * @return \TYPO3\CMS\Core\Database\DatabaseConnection
-     */
-    protected function getDatabaseConnection()
-    {
-        return $GLOBALS['TYPO3_DB'];
     }
 
     /**

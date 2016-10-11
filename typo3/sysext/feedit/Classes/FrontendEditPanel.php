@@ -15,13 +15,13 @@ namespace TYPO3\CMS\Feedit;
  */
 use TYPO3\CMS\Backend\FrontendBackendUserAuthentication;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
-use TYPO3\CMS\Core\Database\DatabaseConnection;
 use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Type\Bitmask\JsConfirmation;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
+use TYPO3\CMS\Core\Utility\PathUtility;
 use TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController;
 use TYPO3\CMS\Frontend\View\AdminPanelView;
 
@@ -45,13 +45,6 @@ class FrontendEditPanel
     protected $frontendController;
 
     /**
-     * Property for accessing DatabaseConnection centrally
-     *
-     * @var DatabaseConnection
-     */
-    protected $databaseConnection;
-
-    /**
      * @var FrontendBackendUserAuthentication
      */
     protected $backendUser;
@@ -64,13 +57,12 @@ class FrontendEditPanel
     /**
      * Constructor for the edit panel
      *
-     * @param DatabaseConnection $databaseConnection
+     * @param mixed $_ Previous the database connection
      * @param TypoScriptFrontendController $frontendController
      * @param FrontendBackendUserAuthentication $backendUser
      */
-    public function __construct(DatabaseConnection $databaseConnection = null, TypoScriptFrontendController $frontendController = null, FrontendBackendUserAuthentication $backendUser = null)
+    public function __construct($_ = null, TypoScriptFrontendController $frontendController = null, FrontendBackendUserAuthentication $backendUser = null)
     {
-        $this->databaseConnection = $databaseConnection ?: $GLOBALS['TYPO3_DB'];
         $this->frontendController = $frontendController ?: $GLOBALS['TSFE'];
         $this->backendUser = $backendUser ?: $GLOBALS['BE_USER'];
         $this->cObj = GeneralUtility::makeInstance(\TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer::class);
@@ -306,7 +298,7 @@ class FrontendEditPanel
     {
         $width = MathUtility::forceIntegerInRange($this->backendUser->getTSConfigVal('options.feedit.popupWidth'), 690, 5000, 690);
         $height = MathUtility::forceIntegerInRange($this->backendUser->getTSConfigVal('options.feedit.popupHeight'), 500, 5000, 500);
-        $onclick = 'vHWin=window.open(' . GeneralUtility::quoteJSvalue($url . '&returnUrl=' . ExtensionManagementUtility::extRelPath('backend') . 'Resources/Private/Templates/Close.html') . ',\'FEquickEditWindow\',\'width=' . $width . ',height=' . $height . ',status=0,menubar=0,scrollbars=1,resizable=1\');vHWin.focus();return false;';
+        $onclick = 'vHWin=window.open(' . GeneralUtility::quoteJSvalue($url . '&returnUrl=' . PathUtility::getAbsoluteWebPath(ExtensionManagementUtility::siteRelPath('backend') . 'Resources/Private/Templates/Close.html')) . ',\'FEquickEditWindow\',\'width=' . $width . ',height=' . $height . ',status=0,menubar=0,scrollbars=1,resizable=1\');vHWin.focus();return false;';
         return '<a href="#" class="btn btn-default btn-sm ' . htmlspecialchars($additionalClasses) . '" onclick="' . htmlspecialchars($onclick) . '" class="frontEndEditIconLinks">' . $string . '</a>';
     }
 

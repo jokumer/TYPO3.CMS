@@ -284,7 +284,7 @@ class Testbase
             if (!file_exists($sourcePath)) {
                 throw new Exception(
                     'Path ' . $sourcePath . ' not found',
-                    1376745645
+                    1476109221
                 );
             }
             $destinationPath = $instancePath . '/' . ltrim($destinationPathToLinkInTestInstance, '/');
@@ -629,7 +629,8 @@ class Testbase
             }
 
             $tableName = $table->getName();
-            $connection = (new ConnectionPool())->getConnectionForTable($tableName);
+            $connection = GeneralUtility::makeInstance(ConnectionPool::class)
+                ->getConnectionForTable($tableName);
             $connection->insert(
                 $tableName,
                 $insertArray

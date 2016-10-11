@@ -1857,8 +1857,8 @@ class TcaSelectItemsTest extends UnitTestCase
         $queryBuilderProphet->andWhere(' 1=1')->shouldBeCalled()->willReturn($queryBuilderProphet->reveal());
         $queryBuilderProphet->andWhere('`pages.uid` = `fTable.pid`')->shouldBeCalled()->willReturn($queryBuilderProphet->reveal());
 
-        $prevException = new DBALException('Invalid table name', 400);
-        $exception = new DBALException('Driver error', 500, $prevException);
+        $prevException = new DBALException('Invalid table name', 1476045274);
+        $exception = new DBALException('Driver error', 1476045971, $prevException);
 
         $queryBuilderProphet->execute()->shouldBeCalled()->willThrow($exception);
 
@@ -2679,7 +2679,7 @@ class TcaSelectItemsTest extends UnitTestCase
                                     || $parameters['row'] !== [ 'aField' => 'aValue' ]
                                     || $parameters['field'] !== 'aField'
                                 ) {
-                                    throw new \UnexpectedValueException('broken', 1438604329);
+                                    throw new \UnexpectedValueException('broken', 1476109436);
                                 }
                             },
                         ],
@@ -2742,7 +2742,7 @@ class TcaSelectItemsTest extends UnitTestCase
                                 ],
                             ],
                             'itemsProcFunc' => function (array $parameters, $pObj) {
-                                throw new \UnexpectedValueException('anException', 1438604329);
+                                throw new \UnexpectedValueException('anException', 1476109437);
                             },
                         ],
                     ],
@@ -3184,6 +3184,97 @@ class TcaSelectItemsTest extends UnitTestCase
             ['[ INVALID VALUE "1" ]', '1', null, null],
             ['foo', 'foo', null, null],
         ];
+        $this->assertEquals($expected, $this->subject->addData($input));
+    }
+
+    /**
+     * @test
+     */
+    public function processSelectFieldValueReturnsDuplicateValuesForMultipleSelect()
+    {
+        $languageService = $this->prophesize(LanguageService::class);
+        $GLOBALS['LANG'] = $languageService->reveal();
+        $languageService->sL(Argument::cetera())->willReturnArgument(0);
+
+        $input = [
+            'tableName' => 'aTable',
+            'databaseRow' => [
+                'aField' => '1,foo,foo,2,bar',
+            ],
+            'processedTca' => [
+                'columns' => [
+                    'aField' => [
+                        'config' => [
+                            'type' => 'select',
+                            'renderType' => 'selectSingle',
+                            'multiple' => true,
+                            'maxitems' => 999,
+                            'items' => [
+                                ['1', '1', null, null],
+                                ['foo', 'foo', null, null],
+                                ['bar', 'bar', null, null],
+                                ['2', '2', null, null],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $expected = $input;
+        $expected['databaseRow']['aField'] = [
+            '1',
+            'foo',
+            'foo',
+            '2',
+            'bar'
+        ];
+
+        $this->assertEquals($expected, $this->subject->addData($input));
+    }
+
+    /**
+     * @test
+     */
+    public function processSelectFieldValueReturnsUniqueValuesForMultipleSelect()
+    {
+        $languageService = $this->prophesize(LanguageService::class);
+        $GLOBALS['LANG'] = $languageService->reveal();
+        $languageService->sL(Argument::cetera())->willReturnArgument(0);
+
+        $input = [
+            'tableName' => 'aTable',
+            'databaseRow' => [
+                'aField' => '1,foo,foo,2,bar',
+            ],
+            'processedTca' => [
+                'columns' => [
+                    'aField' => [
+                        'config' => [
+                            'type' => 'select',
+                            'renderType' => 'selectSingle',
+                            'multiple' => false,
+                            'maxitems' => 999,
+                            'items' => [
+                                ['1', '1', null, null],
+                                ['foo', 'foo', null, null],
+                                ['bar', 'bar', null, null],
+                                ['2', '2', null, null],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $expected = $input;
+        $expected['databaseRow']['aField'] = [
+            0 => '1',
+            1 => 'foo',
+            3 => '2',
+            4 => 'bar',
+        ];
+
         $this->assertEquals($expected, $this->subject->addData($input));
     }
 

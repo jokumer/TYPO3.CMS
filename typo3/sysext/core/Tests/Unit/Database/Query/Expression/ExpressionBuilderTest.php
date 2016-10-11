@@ -275,6 +275,85 @@ class ExpressionBuilderTest extends UnitTestCase
     /**
      * @test
      */
+    public function inSetForSQLite()
+    {
+        $databasePlatform = $this->prophesize(MockPlatform::class);
+        $databasePlatform->getName()->willReturn('sqlite');
+        $databasePlatform->getStringLiteralQuoteCharacter()->willReturn("'");
+
+        $this->connectionProphet->quote(',', Argument::cetera())->shouldBeCalled()->willReturn("','");
+        $this->connectionProphet->quote('%,1,%', Argument::cetera())->shouldBeCalled()->willReturn("'%,1,%'");
+        $this->connectionProphet->quoteIdentifier(Argument::cetera())->will(function ($args) {
+            return '"' . $args[0] . '"';
+        });
+
+        $this->connectionProphet->getDatabasePlatform()->willReturn($databasePlatform->reveal());
+
+        $result = $this->subject->inSet('aField', "'1'");
+
+        $this->assertSame('\',\'||"aField"||\',\' LIKE \'%,1,%\'', $result);
+    }
+
+    /**
+     * @test
+     */
+    public function inSetForSQLiteWithQuoteCharactersInValue()
+    {
+        $databasePlatform = $this->prophesize(MockPlatform::class);
+        $databasePlatform->getName()->willReturn('sqlite');
+        $databasePlatform->getStringLiteralQuoteCharacter()->willReturn("'");
+
+        $this->connectionProphet->quote(',', Argument::cetera())->shouldBeCalled()->willReturn("','");
+        $this->connectionProphet->quote('%,\'Some\'Value,%', Argument::cetera())->shouldBeCalled()
+            ->willReturn("'%,''Some''Value,%'");
+        $this->connectionProphet->quoteIdentifier(Argument::cetera())->will(function ($args) {
+            return '"' . $args[0] . '"';
+        });
+
+        $this->connectionProphet->getDatabasePlatform()->willReturn($databasePlatform->reveal());
+
+        $result = $this->subject->inSet('aField', "'''Some''Value'");
+
+        $this->assertSame('\',\'||"aField"||\',\' LIKE \'%,\'\'Some\'\'Value,%\'', $result);
+    }
+
+    /**
+     * @test
+     */
+    public function inSetForSQLiteThrowsExceptionOnPositionalPlaceholder()
+    {
+        $databasePlatform = $this->prophesize(MockPlatform::class);
+        $databasePlatform->getName()->willReturn('sqlite');
+        $databasePlatform->getStringLiteralQuoteCharacter()->willReturn("'");
+
+        $this->connectionProphet->getDatabasePlatform()->willReturn($databasePlatform->reveal());
+
+        $this->expectException('InvalidArgumentException');
+        $this->expectExceptionCode(1476029421);
+
+        $this->subject->inSet('aField', '?');
+    }
+
+    /**
+     * @test
+     */
+    public function inSetForSQLiteThrowsExceptionOnNamedPlaceholder()
+    {
+        $databasePlatform = $this->prophesize(MockPlatform::class);
+        $databasePlatform->getName()->willReturn('sqlite');
+        $databasePlatform->getStringLiteralQuoteCharacter()->willReturn("'");
+
+        $this->connectionProphet->getDatabasePlatform()->willReturn($databasePlatform->reveal());
+
+        $this->expectException('InvalidArgumentException');
+        $this->expectExceptionCode(1476029421);
+
+        $this->subject->inSet('aField', ':dcValue1');
+    }
+
+    /**
+     * @test
+     */
     public function defaultBitwiseAnd()
     {
         $databasePlatform = $this->prophesize(MockPlatform::class);

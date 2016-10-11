@@ -41,8 +41,10 @@ module.exports = function(grunt) {
 			t3editor  : '<%= paths.sysext %>t3editor/Resources/',
 			workspaces: '<%= paths.sysext %>workspaces/Resources/',
 			core      : '<%= paths.sysext %>core/Resources/',
-			flags     : 'bower_components/region-flags/svg/',
-			t3icons   : 'bower_components/wmdbsystems-typo3-icons/dist/'
+			bower     : 'bower_components/',
+			flags     : '<%= paths.bower %>region-flags/svg/',
+			t3icons   : '<%= paths.bower %>wmdbsystems-typo3-icons/dist/',
+			npm       : 'node_modules/'
 		},
 		less: {
 			options: {
@@ -130,6 +132,28 @@ module.exports = function(grunt) {
 				src: '<%= paths.workspaces %>Public/Css/*.css'
 			}
 		},
+		ts: {
+			default : {
+				tsconfig: true,
+				options: {
+					verbose: false
+				}
+			}
+		},
+		tslint: {
+			options: {
+				configuration: 'tslint.json',
+				force: false
+			},
+			files: {
+				src: [
+					'<%= paths.sysext %>*/Resources/Private/TypeScript/**/*.ts'
+				]
+			}
+		},
+		typings: {
+			install: {}
+		},
 		watch: {
 			options: {
 				livereload: true
@@ -137,11 +161,26 @@ module.exports = function(grunt) {
 			less: {
 				files: '<%= paths.less %>**/*.less',
 				tasks: 'css'
+			},
+			ts: {
+				files: '<%= paths.sysext %>*/Resources/Private/TypeScript/**/*.ts',
+				tasks: 'scripts'
 			}
 		},
 		copy: {
 			options: {
 				punctuation: ''
+			},
+			ts_files: {
+				files: [{
+					expand: true,
+					cwd: '<%= paths.root %>Build/JavaScript/typo3/sysext/',
+					src: ['**/*.js', '**/*.js.map'],
+					dest: '<%= paths.sysext %>',
+					rename: function(dest, src) {
+						return dest + src.replace('Resources/Private/TypeScript', 'Resources/Public/JavaScript');
+					}
+				}]
 			},
 			core_icons: {
 				files: [{
@@ -180,6 +219,11 @@ module.exports = function(grunt) {
 					{ dest: '<%= paths.sysext %>version/Resources/Public/Icons/module-version.svg', src: '<%= paths.t3icons %>module/module-version.svg' },
 					{ dest: '<%= paths.sysext %>viewpage/Resources/Public/Icons/module-viewpage.svg', src: '<%= paths.t3icons %>module/module-viewpage.svg' },
 					{ dest: '<%= paths.sysext %>workspaces/Resources/Public/Icons/module-workspaces.svg', src: '<%= paths.t3icons %>module/module-workspaces.svg' }
+				]
+			},
+			npm: {
+				files: [
+					{dest: '<%= paths.install %>Public/JavaScript/tagsort.min.js', src: '<%= paths.npm %>tagsort/tagsort.js'}
 				]
 			}
 		},
@@ -261,7 +305,8 @@ module.exports = function(grunt) {
 					"<%= paths.core %>Public/JavaScript/Contrib/jquery-ui/resizable.js": ["<%= paths.core %>Public/JavaScript/Contrib/jquery-ui/resizable.js"],
 					"<%= paths.core %>Public/JavaScript/Contrib/jquery-ui/selectable.js": ["<%= paths.core %>Public/JavaScript/Contrib/jquery-ui/selectable.js"],
 					"<%= paths.core %>Public/JavaScript/Contrib/jquery-ui/sortable.js": ["<%= paths.core %>Public/JavaScript/Contrib/jquery-ui/sortable.js"],
-					"<%= paths.core %>Public/JavaScript/Contrib/jquery-ui/widget.js": ["<%= paths.core %>Public/JavaScript/Contrib/jquery-ui/widget.js"]
+					"<%= paths.core %>Public/JavaScript/Contrib/jquery-ui/widget.js": ["<%= paths.core %>Public/JavaScript/Contrib/jquery-ui/widget.js"],
+					"<%= paths.install %>Public/JavaScript/tagsort.min.js": ["<%= paths.install %>Public/JavaScript/tagsort.min.js"]
 				}
 			}
 		},
@@ -294,7 +339,11 @@ module.exports = function(grunt) {
 	grunt.loadNpmTasks('grunt-contrib-uglify');
 	grunt.loadNpmTasks('grunt-svgmin');
 	grunt.loadNpmTasks('grunt-postcss');
+	grunt.loadNpmTasks('grunt-contrib-copy');
 	grunt.loadNpmTasks('grunt-copy');
+	grunt.loadNpmTasks("grunt-ts");
+	grunt.loadNpmTasks('grunt-tslint');
+	grunt.loadNpmTasks('grunt-typings');
 
 	/**
 	 * grunt default task
@@ -323,10 +372,23 @@ module.exports = function(grunt) {
 	 *
 	 * this task does the following things:
 	 * - npm install
+	 * - typings install
 	 * - bower install
 	 * - copy some bower components to a specific destinations because they need to be included via PHP
 	 */
-	grunt.registerTask('update', ['npm-install', 'bower_install', 'bowercopy']);
+	grunt.registerTask('update', ['npm-install', 'typings', 'bower_install', 'bowercopy']);
+
+	/**
+	 * grunt scripts task
+	 *
+	 * call "$ grunt scripts"
+	 *
+	 * this task does the following things:
+	 * - 1) Check all TypeScript files (*.ts) with TSLint which are located in sysext/<EXTKEY>/Resources/Private/TypeScript/*.ts
+	 * - 2) Compiles all TypeScript files (*.ts) which are located in sysext/<EXTKEY>/Resources/Private/TypeScript/*.ts
+	 * - 3) Copy all generated JavaScript and Map files to public folders
+	 */
+	grunt.registerTask('scripts', ['tslint', 'ts', 'copy:ts_files']);
 
 	/**
 	 * grunt build task
@@ -339,6 +401,7 @@ module.exports = function(grunt) {
 	 * - compile less files
 	 * - uglify js files
 	 * - minifies svg files
+	 * - compiles TypeScript files
 	 */
-	grunt.registerTask('build', ['update', 'copy', 'css', 'uglify', 'svgmin']);
+	grunt.registerTask('build', ['update', 'scripts', 'copy', 'css', 'uglify', 'svgmin']);
 };
