@@ -18,7 +18,6 @@ use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Messaging\FlashMessage;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Core\Utility\StringUtility;
 use TYPO3\CMS\Scheduler\AdditionalFieldProviderInterface;
 use TYPO3\CMS\Scheduler\Controller\SchedulerModuleController;
 
@@ -191,7 +190,7 @@ class OptimizeDatabaseTableAdditionalFieldProvider implements AdditionalFieldPro
     protected function getOptimizableTablesForConnection(Connection $connection, array $tableNames = []): array
     {
         // Return empty list if the database platform is not MySQL
-        if (!StringUtility::beginsWith($connection->getServerVersion(), 'MySQL')) {
+        if (strpos($connection->getServerVersion(), 'MySQL') !== 0) {
             return [];
         }
 
@@ -201,18 +200,27 @@ class OptimizeDatabaseTableAdditionalFieldProvider implements AdditionalFieldPro
         $queryBuilder->select('TABLE_NAME AS Table', 'ENGINE AS Engine')
             ->from('information_schema.TABLES')
             ->where(
-                $queryBuilder->expr()->eq('TABLE_TYPE', $queryBuilder->quote('BASE TABLE')),
-                $queryBuilder->expr()->in('ENGINE', [
-                    $queryBuilder->quote('InnoDB'),
-                    $queryBuilder->quote('MyISAM'),
-                    $queryBuilder->quote('ARCHIVE'),
-                ]),
-                $queryBuilder->expr()->eq('TABLE_SCHEMA', $queryBuilder->quote($connection->getDatabase()))
+                $queryBuilder->expr()->eq(
+                    'TABLE_TYPE',
+                    $queryBuilder->createNamedParameter('BASE TABLE', \PDO::PARAM_STR)
+                ),
+                $queryBuilder->expr()->in(
+                    'ENGINE',
+                    $queryBuilder->createNamedParameter(['InnoDB', 'MyISAM', 'ARCHIVE'], Connection::PARAM_STR_ARRAY)
+                ),
+                $queryBuilder->expr()->eq(
+                    'TABLE_SCHEMA',
+                    $queryBuilder->createNamedParameter($connection->getDatabase(), \PDO::PARAM_STR)
+                )
             );
 
         if (!empty($tableNames)) {
-            $tableNames = array_map([$queryBuilder, 'quote'], $tableNames);
-            $queryBuilder->andWhere($queryBuilder->expr()->in('TABLE_NAME', $tableNames));
+            $queryBuilder->andWhere(
+                $queryBuilder->expr()->in(
+                    'TABLE_NAME',
+                    $queryBuilder->createNamedParameter($tableNames, \PDO::PARAM_STR)
+                )
+            );
         }
 
         $tables = $queryBuilder->execute()->fetchAll();

@@ -14,6 +14,7 @@ namespace TYPO3\CMS\Fluid\Core\ViewHelper;
  * The TYPO3 project - inspiring people to share!
  */
 
+use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Object\ObjectManager;
 use TYPO3\CMS\Extbase\Object\ObjectManagerInterface;
@@ -35,22 +36,36 @@ use TYPO3\CMS\Extbase\Object\ObjectManagerInterface;
  * made capable of "mixing" two different ViewHelper namespaces
  * to effectively create aliases for the Fluid core ViewHelpers
  * to be loaded in the TYPO3\CMS\ViewHelpers scope as well.
+ *
+ * Default ViewHelper namespaces are read TYPO3 configuration at:
+ *
+ * $GLOBALS['TYPO3_CONF_VARS']['SYS']['fluid']['namespaces']
+ *
+ * Extending this array allows third party ViewHelper providers
+ * to automatically add or extend namespaces which then become
+ * available in every Fluid template file without having to
+ * register the namespace.
  */
 class ViewHelperResolver extends \TYPO3Fluid\Fluid\Core\ViewHelper\ViewHelperResolver
 {
     /**
-     * Custom merged namespace for CMS Fluid adapter;
-     * will look for classes in both namespaces starting
-     * from the bottom.
+     * ViewHelperResolver constructor
      *
-     * @var array
+     * Loads namespaces defined in global TYPO3 configuration. Overlays `f:`
+     * with `f:debug:` when Fluid debugging is enabled in the admin panel,
+     * causing debugging-specific ViewHelpers to be resolved in that case.
      */
-    protected $namespaces = [
-        'f' => [
-            'TYPO3Fluid\\Fluid\\ViewHelpers',
-            'TYPO3\\CMS\\Fluid\\ViewHelpers'
-        ]
-    ];
+    public function __construct()
+    {
+        $this->namespaces = $GLOBALS['TYPO3_CONF_VARS']['SYS']['fluid']['namespaces'];
+        $configuration = $this->getBackendUser()->uc['TSFE_adminConfig'];
+        if (TYPO3_MODE === 'FE'
+            && isset($configuration['preview_showFluidDebug'])
+            && $configuration['preview_showFluidDebug']
+        ) {
+            $this->namespaces['f'][] = 'TYPO3\\CMS\\Fluid\\ViewHelpers\\Debug';
+        }
+    }
 
     /**
      * @param string $viewHelperClassName
@@ -67,5 +82,13 @@ class ViewHelperResolver extends \TYPO3Fluid\Fluid\Core\ViewHelper\ViewHelperRes
     protected function getObjectManager()
     {
         return GeneralUtility::makeInstance(ObjectManager::class);
+    }
+
+    /**
+     * @return BackendUserAuthentication
+     */
+    protected function getBackendUser()
+    {
+        return $GLOBALS['BE_USER'];
     }
 }

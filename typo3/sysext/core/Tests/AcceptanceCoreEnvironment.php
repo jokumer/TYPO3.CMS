@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 namespace TYPO3\CMS\Core\Tests;
 
 /*
@@ -135,6 +136,8 @@ class AcceptanceCoreEnvironment extends Extension
         'typo3/sysext/core/Tests/Acceptance/Fixtures/be_sessions.xml',
         'typo3/sysext/core/Tests/Acceptance/Fixtures/be_groups.xml',
         'typo3/sysext/core/Tests/Acceptance/Fixtures/sys_category.xml',
+        'typo3/sysext/core/Tests/Acceptance/Fixtures/tx_extensionmanager_domain_model_extension.xml',
+        'typo3/sysext/core/Tests/Acceptance/Fixtures/tx_extensionmanager_domain_model_repository.xml',
     ];
 
     /**
@@ -187,7 +190,7 @@ class AcceptanceCoreEnvironment extends Extension
         );
         $testbase->linkTestExtensionsToInstance($instancePath, $testExtensionsToLoad);
         $testbase->linkPathsInTestInstance($instancePath, $this->pathsToLinkInTestInstance);
-        $localConfiguration = $testbase->getOriginalDatabaseSettingsFromEnvironmentOrLocalConfiguration();
+        $localConfiguration['DB'] = $testbase->getOriginalDatabaseSettingsFromEnvironmentOrLocalConfiguration();
         $originalDatabaseName = $localConfiguration['DB']['Connections']['Default']['dbname'];
         // Append the unique identifier to the base database name to end up with a single database per test case
         $localConfiguration['DB']['Connections']['Default']['dbname'] = $originalDatabaseName . '_at';
@@ -196,7 +199,8 @@ class AcceptanceCoreEnvironment extends Extension
         // $this->configurationToUseInTestInstance if needed again.
         $localConfiguration['BE']['debug'] = true;
         $localConfiguration['BE']['lockHashKeyWords'] = '';
-        $localConfiguration['BE']['installToolPassword'] = '$P$notnotnotnotnotnot.validvalidva';
+        $localConfiguration['BE']['installToolPassword'] = $this->getInstallToolPassword();
+        $localConfiguration['BE']['loginSecurityLevel'] = 'rsa';
         $localConfiguration['SYS']['isInitialInstallationInProgress'] = false;
         $localConfiguration['SYS']['isInitialDatabaseImportDone'] = true;
         $localConfiguration['SYS']['displayErrors'] = false;
@@ -219,6 +223,7 @@ class AcceptanceCoreEnvironment extends Extension
             'rsaauth',
             'saltedpasswords',
             'backend',
+            'about',
             'belog',
             'install',
             't3skin',
@@ -226,7 +231,8 @@ class AcceptanceCoreEnvironment extends Extension
             'recordlist',
             'reports',
             'sv',
-            'scheduler'
+            'scheduler',
+            'tstemplate',
         ];
         $testbase->setUpPackageStates($instancePath, $defaultCoreExtensionsToLoad, $this->coreExtensionsToLoad, $testExtensionsToLoad);
         $testbase->setUpBasicTypo3Bootstrap($instancePath);
@@ -254,6 +260,9 @@ class AcceptanceCoreEnvironment extends Extension
 
         $styleguideGenerator = new Generator();
         $styleguideGenerator->create();
+
+        // @todo: Find out why that is needed to execute the first test successfully
+        $this->cleanupTypo3Environment();
     }
 
     /**
@@ -268,5 +277,23 @@ class AcceptanceCoreEnvironment extends Extension
         GeneralUtility::makeInstance(ConnectionPool::class)
             ->getConnectionForTable('be_users')
             ->update('be_users', ['uc' => null], ['uid' => 1]);
+    }
+
+    /**
+     * Set install tool password. This is either a salted password
+     * of a given typo3InstallToolPassword environment variable, or
+     * a hardcoded value that does not allow login.
+     *
+     * @return string
+     */
+    protected function getInstallToolPassword(): string
+    {
+        $password = getenv('typo3InstallToolPassword');
+        if (!empty($password)) {
+            $saltFactory = \TYPO3\CMS\Saltedpasswords\Salt\SaltFactory::getSaltingInstance(null, 'BE');
+            return $saltFactory->getHashedPassword($password);
+        } else {
+            return '$P$notnotnotnotnotnot.validvalidva';
+        }
     }
 }

@@ -33,10 +33,11 @@ call_user_func(function () {
     $testbase->defineSitePath();
     $testbase->defineTypo3ModeBe();
     $testbase->setTypo3TestingContext();
-    $testbase->createDirectory(PATH_site . 'uploads');
+    $testbase->createDirectory(PATH_site . 'typo3conf/ext');
+    $testbase->createDirectory(PATH_site . 'typo3temp/assets');
     $testbase->createDirectory(PATH_site . 'typo3temp/var/tests');
     $testbase->createDirectory(PATH_site . 'typo3temp/var/transient');
-    $testbase->createDirectory(PATH_site . 'typo3conf/ext');
+    $testbase->createDirectory(PATH_site . 'uploads');
 
     // Retrieve an instance of class loader and inject to core bootstrap
     $classLoaderFilepath = __DIR__ . '/../../../../vendor/autoload.php';
@@ -64,5 +65,6 @@ call_user_func(function () {
     if (!\TYPO3\CMS\Core\Core\Bootstrap::usesComposerClassLoading()) {
         // Dump autoload info if in non composer mode
         \TYPO3\CMS\Core\Core\ClassLoadingInformation::dumpClassLoadingInformation();
+        \TYPO3\CMS\Core\Core\ClassLoadingInformation::registerClassLoadingInformation();
     }
 });

@@ -16,6 +16,7 @@ namespace TYPO3\CMS\SysAction\Backend\ToolbarItems;
 
 use TYPO3\CMS\Backend\Toolbar\ToolbarItemInterface;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
+use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\HiddenRestriction;
 use TYPO3\CMS\Core\Database\Query\Restriction\RootLevelRestriction;
@@ -81,7 +82,7 @@ class ActionToolbarItem implements ToolbarItemInterface
             $actionMenu[] = $linkConf[2];
             $actionMenu[] = '</div>';
             $actionMenu[] = '<div class="dropdown-table-column dropdown-table-title">';
-            $actionMenu[] = '<a class="t3js-topbar-link" href="' . htmlspecialchars($linkConf[1]) . '" target="contentIframe">';
+            $actionMenu[] = '<a class="t3js-topbar-link" href="' . htmlspecialchars($linkConf[1]) . '" target="list_frame">';
             $actionMenu[] = htmlspecialchars($linkConf[0]);
             $actionMenu[] = '</a>';
             $actionMenu[] = '</div>';
@@ -137,7 +138,15 @@ class ActionToolbarItem implements ToolbarItemInterface
                         $queryBuilder->quoteIdentifier('be_groups.uid')
                     )
                 )
-                ->where($queryBuilder->expr()->in('be_groups.uid', GeneralUtility::intExplode(',', $groupList, true)))
+                ->where(
+                    $queryBuilder->expr()->in(
+                        'be_groups.uid',
+                        $queryBuilder->createNamedParameter(
+                            GeneralUtility::intExplode(',', $groupList, true),
+                            Connection::PARAM_INT_ARRAY
+                        )
+                    )
+                )
                 ->groupBy('sys_action.uid');
         }
 

@@ -65,11 +65,6 @@ class BackendController
     protected $toolbarItems = [];
 
     /**
-     * @var int
-     */
-    protected $menuWidth = 190;
-
-    /**
      * @var bool
      */
     protected $debug;
@@ -117,16 +112,13 @@ class BackendController
         $this->pageRenderer->loadExtJS();
         // included for the module menu JavaScript, please note that this is subject to change
         $this->pageRenderer->loadJquery();
-        $this->pageRenderer->addJsInlineCode('consoleOverrideWithDebugPanel', '//already done', false);
         $this->pageRenderer->addExtDirectCode();
         // Add default BE javascript
         $this->jsFiles = [
             'locallang' => $this->getLocalLangFileName(),
             'md5' => 'EXT:backend/Resources/Public/JavaScript/md5.js',
-            'modulemenu' => 'EXT:backend/Resources/Public/JavaScript/modulemenu.js',
             'evalfield' => 'EXT:backend/Resources/Public/JavaScript/jsfunc.evalfield.js',
             'backend' => 'EXT:backend/Resources/Public/JavaScript/backend.js',
-            'iframepanel' => 'EXT:backend/Resources/Public/JavaScript/iframepanel.js',
         ];
         $this->pageRenderer->loadRequireJsModule('TYPO3/CMS/Backend/LoginRefresh', 'function(LoginRefresh) {
 			LoginRefresh.setIntervalTime(' . MathUtility::forceIntegerInRange((int)$GLOBALS['TYPO3_CONF_VARS']['BE']['sessionTimeout'] - 60, 60) . ');
@@ -134,6 +126,9 @@ class BackendController
 			LoginRefresh.setLogoutUrl(' . GeneralUtility::quoteJSvalue(BackendUtility::getModuleUrl('logout')) . ');
 			LoginRefresh.initialize();
 		}');
+
+        // load module menu
+        $this->pageRenderer->loadRequireJsModule('TYPO3/CMS/Backend/ModuleMenu');
 
         // load Toolbar class
         $this->pageRenderer->loadRequireJsModule('TYPO3/CMS/Backend/Toolbar');
@@ -164,9 +159,6 @@ class BackendController
         $this->css = '';
 
         $this->initializeToolbarItems();
-        if (isset($GLOBALS['TBE_STYLES']['dims']['leftMenuFrameW'])) {
-            $this->menuWidth = (int)$GLOBALS['TBE_STYLES']['dims']['leftMenuFrameW'];
-        }
         $this->executeHook('constructPostProcess');
         $this->includeLegacyBackendItems();
     }
@@ -280,20 +272,22 @@ class BackendController
         }
         // if no custom logo was set or the path is invalid, use the original one
         if (empty($logoPath)) {
-            $logoPath = GeneralUtility::getFileAbsFileName('EXT:backend/Resources/Public/Images/typo3-topbar@2x.png');
-        }
-        list($logoWidth, $logoHeight) = @getimagesize($logoPath);
+            $logoPath = GeneralUtility::getFileAbsFileName('EXT:backend/Resources/Public/Images/typo3_logo_orange.svg');
+            $logoWidth = 22;
+            $logoHeight = 22;
+        } else {
+            list($logoWidth, $logoHeight) = @getimagesize($logoPath);
 
-        // High-resolution?
-        if (strpos($logoPath, '@2x.') !== false) {
-            $logoWidth = $logoWidth/2;
-            $logoHeight = $logoHeight/2;
+            // High-resolution?
+            if (strpos($logoPath, '@2x.') !== false) {
+                $logoWidth /= 2;
+                $logoHeight /= 2;
+            }
         }
 
         $view->assign('logoUrl', PathUtility::getAbsoluteWebPath($logoPath));
         $view->assign('logoWidth', $logoWidth);
         $view->assign('logoHeight', $logoHeight);
-        $view->assign('logoLink', TYPO3_URL_GENERAL);
         $view->assign('applicationVersion', TYPO3_version);
         $view->assign('siteName', $GLOBALS['TYPO3_CONF_VARS']['SYS']['sitename']);
         $view->assign('moduleMenu', $this->generateModuleMenu());
@@ -367,7 +361,7 @@ class BackendController
                 $info['extKey'] = 'backend';
             }
             $absoluteComponentPath = ExtensionManagementUtility::extPath($info['extKey']) . $componentDirectory;
-            $relativeComponentPath = PathUtility::getAbsoluteWebPath($absoluteComponentPath);
+            $relativeComponentPath = PathUtility::getRelativePath(PATH_site . TYPO3_mainDir, $absoluteComponentPath);
             $cssFiles = GeneralUtility::getFilesInDir($absoluteComponentPath . 'css/', 'css');
             if (file_exists($absoluteComponentPath . 'css/loadorder.txt')) {
                 // Don't allow inclusion outside directory
@@ -587,10 +581,7 @@ class BackendController
             'uniqueID' => GeneralUtility::shortMD5(uniqid('', true)),
             'pageModule' => $pageModule,
             'inWorkspace' => $beUser->workspace !== 0,
-            'moduleMenuWidth' => $this->menuWidth - 1,
-            'topBarHeight' => isset($GLOBALS['TBE_STYLES']['dims']['topFrameH']) ? (int)$GLOBALS['TBE_STYLES']['dims']['topFrameH'] : 45,
             'showRefreshLoginPopup' => isset($GLOBALS['TYPO3_CONF_VARS']['BE']['showRefreshLoginPopup']) ? (int)$GLOBALS['TYPO3_CONF_VARS']['BE']['showRefreshLoginPopup'] : false,
-            'debugInWindow' => $beUser->uc['debugInWindow'] ? 1 : 0,
             'ContextHelpWindows' => [
                 'width' => 600,
                 'height' => 400
@@ -619,7 +610,6 @@ class BackendController
 	function fsModules() {	//
 		this.recentIds=new Array();					// used by frameset modules to track the most recent used id for list frame.
 		this.navFrameHighlightedID=new Array();		// used by navigation frames to track which row id was highlighted last time
-		this.currentMainLoaded="";
 		this.currentBank="0";
 	}
 	var fsMod = new fsModules();
@@ -670,9 +660,18 @@ class BackendController
                 }
             } else {
                 $this->js .= '
-		// Warning about page editing:
-	alert(' . GeneralUtility::quoteJSvalue(sprintf($this->getLanguageService()->getLL('noEditPage'), $editId)) . ');
-			';
+            // Warning about page editing:
+            require(["TYPO3/CMS/Backend/Modal", "TYPO3/CMS/Backend/Severity"], function(Modal, Severity) {
+                Modal.show("", ' . GeneralUtility::quoteJSvalue(sprintf($this->getLanguageService()->getLL('noEditPage'), $editId)) . ', Severity.notice, [{
+                    text: ' . GeneralUtility::quoteJSvalue($this->getLanguageService()->sL('LLL:EXT:lang/locallang_common.xlf:close')) . ',
+                    active: true,
+                    btnClass: "btn-info",
+                    name: "cancel",
+                    trigger: function () {
+                        Modal.currentModal.trigger("modal-dismiss");
+                    }
+                }])
+            });';
             }
         }
     }
@@ -695,8 +694,6 @@ class BackendController
                 $beUser->writeUC();
             } elseif ($beUser->uc['startModule']) {
                 $startModule = $beUser->uc['startModule'];
-            } elseif ($beUser->uc['startInTaskCenter']) {
-                $startModule = 'user_task';
             }
 
             // check if the start module has additional parameters, so a redirect to a specific

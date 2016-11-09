@@ -9,5 +9,27 @@
 return [
     'syslog:list' => [
         'class' => \TYPO3\CMS\Lowlevel\Command\ListSysLogCommand::class
+    ],
+    'cleanup:missingfiles' => [
+        'class' => \TYPO3\CMS\Lowlevel\Command\MissingFilesCommand::class,
+        // needed for updating the reference index (optional)
+        'user' => '_cli_lowlevel'
+    ],
+    'cleanup:lostfiles' => [
+        'class' => \TYPO3\CMS\Lowlevel\Command\LostFilesCommand::class,
+        // needed for updating the reference index (optional)
+        'user' => '_cli_lowlevel'
+    ],
+    'cleanup:deletedrecords' => [
+        'class' => \TYPO3\CMS\Lowlevel\Command\DeletedRecordsCommand::class,
+        'user' => '_cli_lowlevel'
+    ],
+    'cleanup:orphanrecords' => [
+        'class' => \TYPO3\CMS\Lowlevel\Command\OrphanRecordsCommand::class,
+        'user' => '_cli_lowlevel'
+    ],
+    'cleanup:flexforms' => [
+        'class' => \TYPO3\CMS\Lowlevel\Command\CleanFlexFormsCommand::class,
+        'user' => '_cli_lowlevel'
     ]
 ];

@@ -337,8 +337,11 @@ class SchedulerModuleController extends \TYPO3\CMS\Backend\Module\BaseScriptClas
         $cliUserExists = (int)$queryBuilder->count('*')
             ->from('be_users')
             ->where(
-                $queryBuilder->expr()->eq('username', $queryBuilder->createNamedParameter('_cli_scheduler')),
-                $queryBuilder->expr()->eq('admin', 0)
+                $queryBuilder->expr()->eq(
+                    'username',
+                    $queryBuilder->createNamedParameter('_cli_scheduler', \PDO::PARAM_STR)
+                ),
+                $queryBuilder->expr()->eq('admin', $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT))
             )
             ->execute()
             ->fetchColumn();
@@ -376,13 +379,13 @@ class SchedulerModuleController extends \TYPO3\CMS\Backend\Module\BaseScriptClas
                 $password = $objInstanceSaltedPW->getHashedPassword($password);
             }
             $data = ['be_users' => ['NEW' => ['username' => '_cli_scheduler', 'password' => $password, 'pid' => 0]]];
-            /** @var $tcemain \TYPO3\CMS\Core\DataHandling\DataHandler */
-            $tcemain = GeneralUtility::makeInstance(\TYPO3\CMS\Core\DataHandling\DataHandler::class);
-            $tcemain->start($data, []);
-            $tcemain->process_datamap();
+            /** @var $dataHandler \TYPO3\CMS\Core\DataHandling\DataHandler */
+            $dataHandler = GeneralUtility::makeInstance(\TYPO3\CMS\Core\DataHandling\DataHandler::class);
+            $dataHandler->start($data, []);
+            $dataHandler->process_datamap();
             // Check if a new uid was indeed generated (i.e. a new record was created)
-            // (counting TCEmain errors doesn't work as some failures don't report errors)
-            $numberOfNewIDs = count($tcemain->substNEWwithIDs);
+            // (counting DataHandler errors doesn't work as some failures don't report errors)
+            $numberOfNewIDs = count($dataHandler->substNEWwithIDs);
             if ($numberOfNewIDs === 1) {
                 $message = $this->getLanguageService()->getLL('msg.userCreated');
                 $severity = FlashMessage::OK;
@@ -537,7 +540,12 @@ class SchedulerModuleController extends \TYPO3\CMS\Backend\Module\BaseScriptClas
             // The task could not be unserialized properly, simply delete the database record
             $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('tx_scheduler_task');
             $result = $queryBuilder->delete('tx_scheduler_task')
-                ->where($queryBuilder->expr()->eq('uid', (int)$this->submittedData['uid']))
+                ->where(
+                    $queryBuilder->expr()->eq(
+                        'uid',
+                        $queryBuilder->createNamedParameter($this->submittedData['uid'], \PDO::PARAM_INT)
+                    )
+                )
                 ->execute();
 
             if ($result) {

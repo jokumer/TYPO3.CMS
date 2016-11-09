@@ -28,8 +28,8 @@ class LogoCest
     {
         $I->useExistingSession();
         // Ensure main content frame is fully loaded, otherwise there are load-race-conditions
-        $I->switchToIFrame('content');
-        $I->waitForText('Web>Page module');
+        $I->switchToIFrame('list_frame');
+        $I->waitForText('Web Content Management System');
         $I->switchToIFrame();
     }
 
@@ -38,6 +38,6 @@ class LogoCest
      */
     public function checkIfTypo3LogoIsLinked(Admin $I)
     {
-        $I->seeElement('#typo3-topbar .typo3-topbar-site-logo', ['href' => 'https://typo3.org/']);
+        $I->seeElement('//div[@class="topbar-header-site"]/a[@href="./"]');
     }
 }

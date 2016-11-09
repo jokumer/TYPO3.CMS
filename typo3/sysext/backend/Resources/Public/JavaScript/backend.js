@@ -16,35 +16,6 @@
  * common storage and global object, could later hold more information about the current user etc.
  */
 var TYPO3 = TYPO3 || {};
-TYPO3 = Ext.apply(TYPO3, {
-	// store instances that only should be running once
-	_instances: {},
-	getInstance: function(className) {
-		return TYPO3._instances[className] || false;
-	},
-	addInstance: function(className, instance) {
-		TYPO3._instances[className] = instance;
-		return instance;
-	},
-
-	helpers: {
-		// creates an array by splitting a string into parts, taking a delimiter
-		split: function(str, delim) {
-			var res = [];
-			while (str.indexOf(delim) > 0) {
-				res.push(str.substr(0, str.indexOf(delim)));
-				str = str.substr(str.indexOf(delim) + delim.length);
-			}
-			return res;
-		}
-	}
-});
-
-/**
- * general backend javascript functions
- */
-
-Ext.ns('TYPO3.configuration');
 
 /**
  * jump the backend to a module
@@ -131,8 +102,8 @@ function loadEditId(id,addGetVars)	{	//
 	top.fsMod.recentIds.web = id;
 	top.fsMod.navFrameHighlightedID.web = "pages" + id + "_0";		// For highlighting
 
-	if (top.content && top.content.nav_frame && top.content.nav_frame.refresh_nav) {
-		top.content.nav_frame.refresh_nav();
+	if (top.nav_frame && top.nav_frame.refresh_nav) {
+		top.nav_frame.refresh_nav();
 	}
 	if (TYPO3.configuration.pageModule) {
 		top.goToModule(TYPO3.configuration.pageModule, 0, addGetVars?addGetVars:"");
@@ -157,6 +128,26 @@ function getModuleUrl(inUrl)	{	//
 
 
 
+// Backwards-compatible layer for "old" ExtJS-based code
+// which was in use (top.content) before TYPO3 8.4. Now, the direct "top.nav_frame" and "top.list_frame"
+// calls do work directly.
+// @deprecated since TYPO3 v8, will be removed in TYPO3 v9, this functionality will be removed in TYPO3 v9.
+TYPO3.jQuery(document).on('ready', function() {
+	top.content = {
+		list_frame: top.list_frame,
+		nav_frame: top.nav_frame
+	};
+	// top.nav.refresh() is currently used by the clickmenu inline JS code, and can be removed afterwards
+	top.nav = {
+		refresh: function() {
+			if (top.nav_frame && top.nav_frame.refresh_nav) {
+				top.nav_frame.refresh_nav();
+			} else if (top.TYPO3.Backend && top.TYPO3.Backend.NavigationContainer.PageTree) {
+				top.TYPO3.Backend.NavigationContainer.PageTree.refreshTree();
+			}
+		}
+	};
+});
 
 	// Used by Frameset Modules
 var currentSubScript = "";

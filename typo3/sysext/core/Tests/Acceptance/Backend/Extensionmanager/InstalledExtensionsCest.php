@@ -27,15 +27,13 @@ class InstalledExtensionsCest
     public function _before(Admin $I)
     {
         $I->useExistingSession();
+        // Ensure main content frame is fully loaded, otherwise there are load-race-conditions
+        $I->switchToIFrame('list_frame');
+        $I->waitForText('Web Content Management System');
+        $I->switchToIFrame();
 
-        // clear the localstorage to fix problems in phantomJs where the search
-        // sometimes is preserved over multiple sessions
-        $I->executeInSelenium(function (\Facebook\WebDriver\Remote\RemoteWebDriver $webDriver) {
-            $webDriver->executeScript('localStorage.clear();');
-        });
-
-        $I->click('Extensions', '#typo3-module-menu');
-        $I->switchToIFrame('content');
+        $I->click('Extensions', '#menu');
+        $I->switchToIFrame('list_frame');
         $I->waitForElementVisible('#typo3-extension-list');
     }
 
@@ -74,46 +72,39 @@ class InstalledExtensionsCest
 
     /**
      * @param Admin $I
-     * @return Admin
      */
-    public function checkIfInstallingAnExtensionWithBackendModuleAddsTheModuleToTheModuleMenu(Admin $I)
+    public function checkUninstallingAndInstallingAnExtension(Admin $I)
     {
+        $I->wantTo('Check if uninstalling and installing an extension with backend module removes and adds the module from the module menu.');
+        $I->amGoingTo('uninstall extension belog');
         $I->switchToIFrame();
-        $I->canSeeElement('.typo3-module-menu-item');
-        $I->cantSeeElement('#web_RecyclerRecycler');
+        $I->canSeeElement('#system_BelogLog');
 
-        $I->switchToIFrame('content');
-        $I->fillField('Tx_Extensionmanager_extensionkey', 'recycler');
-        $I->waitForElementVisible('//*[@id="typo3-extension-list"]/tbody/tr[@id="recycler"]');
-        $I->click('a[data-original-title="Activate"]', '//*[@id="typo3-extension-list"]/tbody/tr[@id="recycler"]');
+        $I->switchToIFrame('list_frame');
+        $I->fillField('Tx_Extensionmanager_extensionkey', 'belog');
+        $I->waitForElementVisible('//*[@id="typo3-extension-list"]/tbody/tr[@id="belog"]');
+        $I->click('a[data-original-title="Deactivate"]', '//*[@id="typo3-extension-list"]/tbody/tr[@id="belog"]');
 
         $I->waitForElementVisible('#Tx_Extensionmanager_extensionkey ~button.close', 1);
         $I->click('#Tx_Extensionmanager_extensionkey ~button.close');
 
         $I->switchToIFrame();
-        $I->canSeeElement('#web_RecyclerRecycler');
+        $I->cantSeeElement('#system_BelogLog');
 
-        return $I;
-    }
-
-    /**
-     * @depends checkIfInstallingAnExtensionWithBackendModuleAddsTheModuleToTheModuleMenu
-     * @param Admin $I
-     */
-    public function checkIfUninstallingAnExtensionWithBackendModuleRemovesTheModuleFromTheModuleMenu(Admin $I)
-    {
+        $I->amGoingTo('install extension belog');
         $I->switchToIFrame();
-        $I->canSeeElement('#web_RecyclerRecycler');
+        $I->canSeeElement('.modulemenu-item-link');
+        $I->cantSeeElement('#system_BelogLog');
 
-        $I->switchToIFrame('content');
-        $I->fillField('Tx_Extensionmanager_extensionkey', 'recycler');
-        $I->waitForElementVisible('//*[@id="typo3-extension-list"]/tbody/tr[@id="recycler"]');
-        $I->click('a[data-original-title="Deactivate"]', '//*[@id="typo3-extension-list"]/tbody/tr[@id="recycler"]');
+        $I->switchToIFrame('list_frame');
+        $I->fillField('Tx_Extensionmanager_extensionkey', 'belog');
+        $I->waitForElementVisible('//*[@id="typo3-extension-list"]/tbody/tr[@id="belog"]');
+        $I->click('a[data-original-title="Activate"]', '//*[@id="typo3-extension-list"]/tbody/tr[@id="belog"]');
 
         $I->waitForElementVisible('#Tx_Extensionmanager_extensionkey ~button.close', 1);
         $I->click('#Tx_Extensionmanager_extensionkey ~button.close');
 
         $I->switchToIFrame();
-        $I->cantSeeElement('#web_RecyclerRecycler');
+        $I->canSeeElement('#system_BelogLog');
     }
 }

@@ -18,6 +18,7 @@ use Doctrine\DBAL\DBALException;
 use Doctrine\DBAL\Driver\Statement;
 use TYPO3\CMS\Core\Cache\CacheManager;
 use TYPO3\CMS\Core\Charset\CharsetConverter;
+use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 use TYPO3\CMS\Core\Database\Query\QueryHelper;
@@ -4770,7 +4771,7 @@ class ContentObjectRenderer
                 // tags
                 $len = strcspn(substr($theValue, $pointer), '>') + 1;
                 $data = substr($theValue, $pointer, $len);
-                if (StringUtility::endsWith($data, '/>') && !StringUtility::beginsWith($data, '<link ')) {
+                if (StringUtility::endsWith($data, '/>') && strpos($data, '<link ') !== 0) {
                     $tagContent = substr($data, 1, -2);
                 } else {
                     $tagContent = substr($data, 1, -1);
@@ -5180,7 +5181,7 @@ class ContentObjectRenderer
                 } catch (Exception $exception) {
                     /** @var \TYPO3\CMS\Core\Log\Logger $logger */
                     $logger = GeneralUtility::makeInstance(LogManager::class)->getLogger(__CLASS__);
-                    $logger->warning('The image "' . $file . '" could not be found and won\'t be included in frontend output');
+                    $logger->warning('The image "' . $file . '" could not be found and won\'t be included in frontend output', ['exception' => $exception]);
                     return null;
                 }
             }
@@ -5515,7 +5516,7 @@ class ContentObjectRenderer
         } catch (Exception $exception) {
             /** @var \TYPO3\CMS\Core\Log\Logger $logger */
             $logger = GeneralUtility::makeInstance(LogManager::class)->getLogger(__CLASS__);
-            $logger->warning('The file "' . $fileUidOrCurrentKeyword . '" could not be found and won\'t be included in frontend output');
+            $logger->warning('The file "' . $fileUidOrCurrentKeyword . '" could not be found and won\'t be included in frontend output', ['exception' => $exception]);
             $fileObject = null;
         }
 
@@ -5708,7 +5709,7 @@ class ContentObjectRenderer
         }
 
         // Resolve FAL-api "file:UID-of-sys_file-record" and "file:combined-identifier"
-        if ($linkHandlerKeyword === 'file' && !StringUtility::beginsWith($linkParameterParts['url'], 'file://')) {
+        if ($linkHandlerKeyword === 'file' && strpos($linkParameterParts['url'], 'file://') !== 0) {
             try {
                 $fileOrFolderObject = $this->getResourceFactory()->retrieveFileOrFolderObject($linkHandlerValue);
                 // Link to a folder or file
@@ -5848,7 +5849,7 @@ class ContentObjectRenderer
                     $linkLocation = $fileOrFolderObject->getPublicUrl();
                     // Setting title if blank value to link
                     $linkText = $this->parseFallbackLinkTextIfLinkTextIsEmpty($linkText, rawurldecode($linkLocation));
-                    $linkLocation = (!StringUtility::beginsWith($linkLocation, '/') ? $tsfe->absRefPrefix : '') . $linkLocation;
+                    $linkLocation = (strpos($linkLocation, '/') !== 0 ? $tsfe->absRefPrefix : '') . $linkLocation;
                     $this->lastTypoLinkUrl = $this->processUrl(UrlProcessorInterface::CONTEXT_FILE, $linkLocation, $conf);
                     $this->lastTypoLinkUrl = $this->forceAbsoluteUrl($this->lastTypoLinkUrl, $conf);
 
@@ -6111,7 +6112,7 @@ class ContentObjectRenderer
                     $linkLocation = $linkDetails['file'];
                     // Setting title if blank value to link
                     $linkText = $this->parseFallbackLinkTextIfLinkTextIsEmpty($linkText, rawurldecode($linkLocation));
-                    $linkLocation = (!StringUtility::beginsWith($linkLocation, '/') ? $tsfe->absRefPrefix : '') . $linkLocation;
+                    $linkLocation = (strpos($linkLocation, '/') !== 0 ? $tsfe->absRefPrefix : '') . $linkLocation;
                     $this->lastTypoLinkUrl = $this->processUrl(UrlProcessorInterface::CONTEXT_FILE, $linkLocation, $conf);
                     $this->lastTypoLinkUrl = $this->forceAbsoluteUrl($this->lastTypoLinkUrl, $conf);
                     if (empty($target)) {
@@ -7155,10 +7156,16 @@ class ContentObjectRenderer
             $cacheEntry = $queryBuilder->select('treelist')
                 ->from('cache_treelist')
                 ->where(
-                    $queryBuilder->expr()->eq('md5hash', $queryBuilder->createNamedParameter($requestHash)),
+                    $queryBuilder->expr()->eq(
+                        'md5hash',
+                        $queryBuilder->createNamedParameter($requestHash, \PDO::PARAM_STR)
+                    ),
                     $queryBuilder->expr()->orX(
-                        $queryBuilder->expr()->gt('expires', (int)$GLOBALS['EXEC_TIME']),
-                        $queryBuilder->expr()->eq('expires', 0)
+                        $queryBuilder->expr()->gt(
+                            'expires',
+                            $queryBuilder->createNamedParameter($GLOBALS['EXEC_TIME'], \PDO::PARAM_INT)
+                        ),
+                        $queryBuilder->expr()->eq('expires', $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT))
                     )
                 )
                 ->setMaxResults(1)
@@ -7201,7 +7208,12 @@ class ContentObjectRenderer
                 ->add(GeneralUtility::makeInstance(DeletedRestriction::class));
             $queryBuilder->select(...GeneralUtility::trimExplode(',', $allFields, true))
                 ->from('pages')
-                ->where($queryBuilder->expr()->eq('pid', (int)$id))
+                ->where(
+                    $queryBuilder->expr()->eq(
+                        'pid',
+                        $queryBuilder->createNamedParameter($id, \PDO::PARAM_INT)
+                    )
+                )
                 ->orderBy('sorting');
 
             if (!empty($moreWhereClauses)) {
@@ -7236,7 +7248,12 @@ class ContentObjectRenderer
                         ->add(GeneralUtility::makeInstance(DeletedRestriction::class));
                     $queryBuilder->select(...GeneralUtility::trimExplode(',', $allFields, true))
                         ->from('pages')
-                        ->where($queryBuilder->expr()->eq('uid', (int)$next_id))
+                        ->where(
+                            $queryBuilder->expr()->eq(
+                                'uid',
+                                $queryBuilder->createNamedParameter($next_id, \PDO::PARAM_INT)
+                            )
+                        )
                         ->orderBy('sorting')
                         ->setMaxResults(1);
 
@@ -7351,7 +7368,10 @@ class ContentObjectRenderer
             $searchWord = $queryBuilder->escapeLikeWildcards($searchWord);
             foreach ($searchFields as $field) {
                 $searchWordConstraint->add(
-                    $queryBuilder->expr()->like($prefixTableName . $field, $queryBuilder->quote('%' . $searchWord . '%'))
+                    $queryBuilder->expr()->like(
+                        $prefixTableName . $field,
+                        $queryBuilder->createNamedParameter('%' . $searchWord . '%', \PDO::PARAM_STR)
+                    )
                 );
             }
 
@@ -7534,6 +7554,12 @@ class ContentObjectRenderer
 
         if ($queryParts['groupBy']) {
             $queryBuilder->groupBy(...$queryParts['groupBy']);
+        }
+
+        if (is_array($queryParts['orderBy'])) {
+            foreach ($queryParts['orderBy'] as $orderBy) {
+                $queryBuilder->addOrderBy(...$orderBy);
+            }
         }
 
         // Fields:
@@ -7744,7 +7770,7 @@ class ContentObjectRenderer
                     $expressionBuilder->andX(
                         $expressionBuilder->eq(
                             $table . '.t3ver_state',
-                            VersionState::cast(VersionState::MOVE_PLACEHOLDER)
+                            (int)(string)VersionState::cast(VersionState::MOVE_PLACEHOLDER)
                         ),
                         $expressionBuilder->in($table . '.t3ver_move_id', $listArr)
                     )
@@ -7756,7 +7782,7 @@ class ContentObjectRenderer
         }
 
         // Static_* tables are allowed to be fetched from root page
-        if (StringUtility::beginsWith($table, 'static_')) {
+        if (strpos($table, 'static_') === 0) {
             $pid_uid_flag++;
         }
 
@@ -7977,10 +8003,16 @@ class ContentObjectRenderer
         $queryBuilder->select('uid')
             ->from('pages')
             ->where(
-                $queryBuilder->expr()->in('uid', array_map('intval', $listArr)),
+                $queryBuilder->expr()->in(
+                    'uid',
+                    $queryBuilder->createNamedParameter($listArr, Connection::PARAM_INT_ARRAY)
+                ),
                 $queryBuilder->expr()->notIn(
                     'doktype',
-                    GeneralUtility::intExplode(',', $this->checkPid_badDoktypeList, true)
+                    $queryBuilder->createNamedParameter(
+                        GeneralUtility::intExplode(',', $this->checkPid_badDoktypeList, true),
+                        Connection::PARAM_INT_ARRAY
+                    )
                 )
             );
         try {
@@ -8012,10 +8044,16 @@ class ContentObjectRenderer
             $count = $queryBuilder->count('*')
                 ->from('pages')
                 ->where(
-                    $queryBuilder->expr()->eq('uid', $uid),
+                    $queryBuilder->expr()->eq(
+                        'uid',
+                        $queryBuilder->createNamedParameter($uid, \PDO::PARAM_INT)
+                    ),
                     $queryBuilder->expr()->notIn(
                         'doktype',
-                        GeneralUtility::intExplode(',', $this->checkPid_badDoktypeList, true)
+                        $queryBuilder->createNamedParameter(
+                            GeneralUtility::intExplode(',', $this->checkPid_badDoktypeList, true),
+                            Connection::PARAM_INT_ARRAY
+                        )
                     )
                 )
                 ->execute()

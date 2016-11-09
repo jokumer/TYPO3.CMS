@@ -15,6 +15,7 @@ namespace TYPO3\CMS\Core\Resource\Index;
  * The TYPO3 project - inspiring people to share!
  */
 
+use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\RootLevelRestriction;
 use TYPO3\CMS\Core\Resource\Exception\InvalidUidException;
@@ -28,7 +29,7 @@ use TYPO3\CMS\Extbase\SignalSlot\Dispatcher;
 /**
  * Repository Class as an abstraction layer to sys_file_metadata
  *
- * Every access to table sys_file_metadata which is not handled by TCEmain
+ * Every access to table sys_file_metadata which is not handled by DataHandler
  * has to use this Repository class
  */
 class MetaDataRepository implements SingletonInterface
@@ -100,8 +101,8 @@ class MetaDataRepository implements SingletonInterface
             ->select('*')
             ->from($this->tableName)
             ->where(
-                $queryBuilder->expr()->eq('file', $uid),
-                $queryBuilder->expr()->in('sys_language_uid', [0, -1])
+                $queryBuilder->expr()->eq('file', $queryBuilder->createNamedParameter($uid, \PDO::PARAM_INT)),
+                $queryBuilder->expr()->in('sys_language_uid', $queryBuilder->createNamedParameter([0, -1], Connection::PARAM_INT_ARRAY))
             )
             ->execute()
             ->fetch();

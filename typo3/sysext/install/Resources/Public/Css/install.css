@@ -189,15 +189,15 @@ th {
   padding: 0;
 }
 /*!
- *  Font Awesome 4.6.3 by @davegandy - http://fontawesome.io - @fontawesome
+ *  Font Awesome 4.7.0 by @davegandy - http://fontawesome.io - @fontawesome
  *  License - http://fontawesome.io/license (Font: SIL OFL 1.1, CSS: MIT License)
  */
 /* FONT PATH
  * -------------------------- */
 @font-face {
   font-family: 'FontAwesome';
-  src: url('../../../../../../typo3/sysext/backend/Resources/Public/Fonts/FontAwesome/fontawesome-webfont.eot?v=4.6.3');
-  src: url('../../../../../../typo3/sysext/backend/Resources/Public/Fonts/FontAwesome/fontawesome-webfont.eot?#iefix&v=4.6.3') format('embedded-opentype'), url('../../../../../../typo3/sysext/backend/Resources/Public/Fonts/FontAwesome/fontawesome-webfont.woff2?v=4.6.3') format('woff2'), url('../../../../../../typo3/sysext/backend/Resources/Public/Fonts/FontAwesome/fontawesome-webfont.woff?v=4.6.3') format('woff'), url('../../../../../../typo3/sysext/backend/Resources/Public/Fonts/FontAwesome/fontawesome-webfont.ttf?v=4.6.3') format('truetype'), url('../../../../../../typo3/sysext/backend/Resources/Public/Fonts/FontAwesome/fontawesome-webfont.svg?v=4.6.3#fontawesomeregular') format('svg');
+  src: url('../../../../../../typo3/sysext/backend/Resources/Public/Fonts/FontAwesome/fontawesome-webfont.eot?v=4.7.0');
+  src: url('../../../../../../typo3/sysext/backend/Resources/Public/Fonts/FontAwesome/fontawesome-webfont.eot?#iefix&v=4.7.0') format('embedded-opentype'), url('../../../../../../typo3/sysext/backend/Resources/Public/Fonts/FontAwesome/fontawesome-webfont.woff2?v=4.7.0') format('woff2'), url('../../../../../../typo3/sysext/backend/Resources/Public/Fonts/FontAwesome/fontawesome-webfont.woff?v=4.7.0') format('woff'), url('../../../../../../typo3/sysext/backend/Resources/Public/Fonts/FontAwesome/fontawesome-webfont.ttf?v=4.7.0') format('truetype'), url('../../../../../../typo3/sysext/backend/Resources/Public/Fonts/FontAwesome/fontawesome-webfont.svg?v=4.7.0#fontawesomeregular') format('svg');
   font-weight: normal;
   font-style: normal;
 }
@@ -318,8 +318,7 @@ th {
 :root .fa-rotate-270,
 :root .fa-flip-horizontal,
 :root .fa-flip-vertical {
-  -webkit-filter: none;
-          filter: none;
+  filter: none;
 }
 .fa-stack {
   position: relative;
@@ -1999,6 +1998,7 @@ th {
   content: "\f23e";
 }
 .fa-battery-4:before,
+.fa-battery:before,
 .fa-battery-full:before {
   content: "\f240";
 }
@@ -2344,6 +2344,143 @@ th {
 .fa-fa:before,
 .fa-font-awesome:before {
   content: "\f2b4";
+}
+.fa-handshake-o:before {
+  content: "\f2b5";
+}
+.fa-envelope-open:before {
+  content: "\f2b6";
+}
+.fa-envelope-open-o:before {
+  content: "\f2b7";
+}
+.fa-linode:before {
+  content: "\f2b8";
+}
+.fa-address-book:before {
+  content: "\f2b9";
+}
+.fa-address-book-o:before {
+  content: "\f2ba";
+}
+.fa-vcard:before,
+.fa-address-card:before {
+  content: "\f2bb";
+}
+.fa-vcard-o:before,
+.fa-address-card-o:before {
+  content: "\f2bc";
+}
+.fa-user-circle:before {
+  content: "\f2bd";
+}
+.fa-user-circle-o:before {
+  content: "\f2be";
+}
+.fa-user-o:before {
+  content: "\f2c0";
+}
+.fa-id-badge:before {
+  content: "\f2c1";
+}
+.fa-drivers-license:before,
+.fa-id-card:before {
+  content: "\f2c2";
+}
+.fa-drivers-license-o:before,
+.fa-id-card-o:before {
+  content: "\f2c3";
+}
+.fa-quora:before {
+  content: "\f2c4";
+}
+.fa-free-code-camp:before {
+  content: "\f2c5";
+}
+.fa-telegram:before {
+  content: "\f2c6";
+}
+.fa-thermometer-4:before,
+.fa-thermometer:before,
+.fa-thermometer-full:before {
+  content: "\f2c7";
+}
+.fa-thermometer-3:before,
+.fa-thermometer-three-quarters:before {
+  content: "\f2c8";
+}
+.fa-thermometer-2:before,
+.fa-thermometer-half:before {
+  content: "\f2c9";
+}
+.fa-thermometer-1:before,
+.fa-thermometer-quarter:before {
+  content: "\f2ca";
+}
+.fa-thermometer-0:before,
+.fa-thermometer-empty:before {
+  content: "\f2cb";
+}
+.fa-shower:before {
+  content: "\f2cc";
+}
+.fa-bathtub:before,
+.fa-s15:before,
+.fa-bath:before {
+  content: "\f2cd";
+}
+.fa-podcast:before {
+  content: "\f2ce";
+}
+.fa-window-maximize:before {
+  content: "\f2d0";
+}
+.fa-window-minimize:before {
+  content: "\f2d1";
+}
+.fa-window-restore:before {
+  content: "\f2d2";
+}
+.fa-times-rectangle:before,
+.fa-window-close:before {
+  content: "\f2d3";
+}
+.fa-times-rectangle-o:before,
+.fa-window-close-o:before {
+  content: "\f2d4";
+}
+.fa-bandcamp:before {
+  content: "\f2d5";
+}
+.fa-grav:before {
+  content: "\f2d6";
+}
+.fa-etsy:before {
+  content: "\f2d7";
+}
+.fa-imdb:before {
+  content: "\f2d8";
+}
+.fa-ravelry:before {
+  content: "\f2d9";
+}
+.fa-eercast:before {
+  content: "\f2da";
+}
+.fa-microchip:before {
+  content: "\f2db";
+}
+.fa-snowflake-o:before {
+  content: "\f2dc";
+}
+.fa-superpowers:before {
+  content: "\f2dd";
+}
+.fa-wpexplorer:before {
+  content: "\f2de";
+}
+.fa-meetup:before {
+  content: "\f2e0";
 }
 .sr-only {
   position: absolute;
@@ -7123,9 +7260,13 @@ body {
   bottom: 0;
   display: none;
 }
+.scaffold-toolbar .dropdown-menu a,
 .scaffold-toolbar a {
   color: rgba(255, 255, 255, 0.7);
 }
+.scaffold-toolbar .dropdown-menu a:focus,
+.scaffold-toolbar a:focus,
+.scaffold-toolbar .dropdown-menu a:hover,
 .scaffold-toolbar a:hover {
   color: #fff;
 }
@@ -7335,22 +7476,21 @@ body {
 }
 .topbar-header {
   padding-left: 80px;
-  padding-right: 80px;
+}
+@media (max-width: 991px) {
+  .topbar-header {
+    padding-right: 80px !important;
+  }
 }
 .topbar-header-site {
+  overflow: hidden;
   position: relative;
-  display: block;
   max-width: 100%;
   height: 45px;
   line-height: 45px;
   padding-left: 1em;
   padding-right: 1em;
   white-space: nowrap;
-}
-@media (min-width: 992px) {
-  .topbar-header-site {
-    display: inline-block;
-  }
 }
 .topbar-header-site:before,
 .topbar-header-site:after {
@@ -7362,18 +7502,18 @@ body {
   width: 1em;
 }
 .topbar-header-site:before {
-  left: 0;
-  background: linear-gradient(to right, #1f1f1e 0%, rgba(31, 31, 30, 0) 100%);
+  right: 0;
+  background: #1f1f1e;
 }
 .topbar-header-site:after {
-  right: 0;
+  right: 1em;
   background: linear-gradient(to right, rgba(31, 31, 30, 0) 0%, #1f1f1e 100%);
 }
 .typo3-in-workspace .topbar-header-site {
   background-color: #6d860d;
 }
 .typo3-in-workspace .topbar-header-site:before {
-  background: linear-gradient(to right, #6d860d 0%, rgba(109, 134, 13, 0) 100%);
+  background: #6d860d;
 }
 .typo3-in-workspace .topbar-header-site:after {
   background: linear-gradient(to right, rgba(109, 134, 13, 0) 0%, #6d860d 100%);
@@ -7405,6 +7545,7 @@ body {
 @media (min-width: 992px) {
   .toolbar {
     padding: 0;
+    background-color: #1f1f1e;
   }
 }
 .toolbar:after {
@@ -7416,6 +7557,11 @@ body {
   list-style: none;
   padding: 0;
   margin: 0;
+}
+.toolbar-list:after {
+  clear: both;
+  display: table;
+  content: '';
 }
 .toolbar-item {
   padding: 4px;
@@ -7443,6 +7589,13 @@ body {
 }
 .toolbar-item .dropdown-menu {
   width: 350px;
+}
+.toolbar-item .dropdown-menu .text-muted {
+  color: #8c8c8c;
+}
+.toolbar-item .dropdown-menu a:hover .text-muted,
+.toolbar-item .dropdown-menu a:focus .text-muted {
+  color: #a6a6a6;
 }
 @media (max-width: 991px) {
   .toolbar-item .dropdown-menu {
@@ -7688,11 +7841,15 @@ body {
   border: 0;
   margin: 0;
   border-radius: 0;
+  color: #ffffff;
 }
 .dropdown-menu a {
+  color: inherit;
   display: block;
 }
+.dropdown-menu a:focus,
 .dropdown-menu a:hover {
+  color: inherit;
   text-decoration: none;
 }
 .dropdown-menu hr {

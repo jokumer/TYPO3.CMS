@@ -103,16 +103,16 @@ class InfoPageTyposcriptConfigController extends \TYPO3\CMS\Backend\Module\Abstr
                 $pUids = [];
 
                 foreach ($TSparts as $k => $v) {
-                    if ($k != 'uid_0') {
+                    if ($k !== 'uid_0') {
                         $line = [];
-                        if ($k == 'defaultPageTSconfig') {
+                        if ($k === 'defaultPageTSconfig') {
                             $line['defaultPageTSconfig'] = 1;
                         } else {
-                            $pUids[] = substr($k, 4);
-                            $row = BackendUtility::getRecordWSOL('pages', substr($k, 4));
+                            $editIdList = substr($k, 4);
+                            $pUids[] = $editIdList;
+                            $row = BackendUtility::getRecordWSOL('pages', $editIdList);
 
                             $icon = $this->iconFactory->getIconForRecord('pages', $row, Icon::SIZE_SMALL);
-                            $editIdList = substr($k, 4);
                             $urlParameters = [
                                 'edit' => [
                                     'pages' => [
@@ -239,7 +239,12 @@ class InfoPageTyposcriptConfigController extends \TYPO3\CMS\Backend\Module\Abstr
         $res = $queryBuilder
             ->select('uid', 'TSconfig')
             ->from('pages')
-            ->where($queryBuilder->expr()->neq('TSconfig', $queryBuilder->quote('')))
+            ->where(
+                $queryBuilder->expr()->neq(
+                    'TSconfig',
+                    $queryBuilder->createNamedParameter('', \PDO::PARAM_STR)
+                )
+            )
             ->groupBy('uid')
             ->execute();
 

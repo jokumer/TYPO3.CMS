@@ -16,12 +16,12 @@ namespace TYPO3\CMS\Reports\Report\Status;
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 use TYPO3\CMS\Core\Messaging\FlashMessage;
 use TYPO3\CMS\Core\Messaging\FlashMessageService;
 use TYPO3\CMS\Core\Registry;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\PathUtility;
-use TYPO3\CMS\Core\Utility\StringUtility;
 use TYPO3\CMS\Lang\LanguageService;
 use TYPO3\CMS\Reports\Status as ReportStatus;
 use TYPO3\CMS\Reports\StatusProviderInterface;
@@ -276,7 +276,7 @@ class ConfigurationStatus implements StatusProviderInterface
         $connection = GeneralUtility::makeInstance(ConnectionPool::class)
             ->getConnectionByName(ConnectionPool::DEFAULT_CONNECTION_NAME);
 
-        return StringUtility::beginsWith($connection->getServerVersion(), 'MySQL');
+        return strpos($connection->getServerVersion(), 'MySQL') === 0;
     }
 
     /**
@@ -288,11 +288,15 @@ class ConfigurationStatus implements StatusProviderInterface
     {
         $connection = GeneralUtility::makeInstance(ConnectionPool::class)
             ->getConnectionByName(ConnectionPool::DEFAULT_CONNECTION_NAME);
+        /** @var QueryBuilder $queryBuilder */
         $queryBuilder = $connection->createQueryBuilder();
         $defaultDatabaseCharset = (string)$queryBuilder->select('DEFAULT_CHARACTER_SET_NAME')
             ->from('information_schema.SCHEMATA')
             ->where(
-                $queryBuilder->expr()->eq('SCHEMA_NAME', $queryBuilder->quote($connection->getDatabase()))
+                $queryBuilder->expr()->eq(
+                    'SCHEMA_NAME',
+                    $queryBuilder->createNamedParameter($connection->getDatabase(), \PDO::PARAM_STR)
+                )
             )
             ->setMaxResults(1)
             ->execute()
@@ -301,11 +305,30 @@ class ConfigurationStatus implements StatusProviderInterface
         $severity = ReportStatus::OK;
         $statusValue = $this->getLanguageService()->getLL('status_ok');
         // also allow utf8mb4
-        if (!StringUtility::beginsWith($defaultDatabaseCharset, 'utf8')) {
-            $message = sprintf($this->getLanguageService()
-                ->getLL('status_MysqlDatabaseCharacterSet_Unsupported'), $defaultDatabaseCharset);
-            $severity = ReportStatus::ERROR;
-            $statusValue = $this->getLanguageService()->getLL('status_wrongValue');
+        if (strpos($defaultDatabaseCharset, 'utf8') !== 0) {
+            // If the default character set is e.g. latin1, BUT all tables in the system are UTF-8,
+            // we assume that TYPO3 has the correct charset for adding tables, and everything is fine
+            $nonUtf8TableCollationsFound = $queryBuilder->select('table_collation')
+                ->from('information_schema.tables')
+                ->where(
+                    $queryBuilder->expr()->andX(
+                        $queryBuilder->expr()->eq('table_schema', $queryBuilder->quote($connection->getDatabase())),
+                        $queryBuilder->expr()->notLike('table_collation', $queryBuilder->quote('utf8%'))
+                    )
+                )
+                ->setMaxResults(1)
+                ->execute();
+
+            if ($nonUtf8TableCollationsFound->rowCount() > 0) {
+                $message = sprintf($this->getLanguageService()
+                    ->getLL('status_MysqlDatabaseCharacterSet_Unsupported'), $defaultDatabaseCharset);
+                $severity = ReportStatus::ERROR;
+                $statusValue = $this->getLanguageService()->getLL('status_wrongValue');
+            } else {
+                $message = $this->getLanguageService()->getLL('status_MysqlDatabaseCharacterSet_Info');
+                $severity = ReportStatus::INFO;
+                $statusValue = $this->getLanguageService()->getLL('status_info');
+            }
         } else {
             $message = $this->getLanguageService()->getLL('status_MysqlDatabaseCharacterSet_Ok');
         }

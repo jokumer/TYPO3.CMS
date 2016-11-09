@@ -29,7 +29,6 @@ use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Schema\Parser\Parser;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Core\Utility\StringUtility;
 
 /**
  * Helper methods to handle SQL files and transform them into individual statements
@@ -435,7 +434,16 @@ class SchemaMigrator
 
             // We need to keep multiple table definitions at this point so
             // that Extensions can modify existing tables.
-            $tables[] = $createTableParser->parse();
+            try {
+                $tables[] = $createTableParser->parse();
+            } catch (\TYPO3\CMS\Core\Database\Schema\Exception\StatementException $statementException) {
+                // Enrich the error message with the full invalid statement
+                throw new \TYPO3\CMS\Core\Database\Schema\Exception\StatementException(
+                    $statementException->getMessage() . ' in statement ' . $statement,
+                    1476171315,
+                    $statementException
+                );
+            }
         }
 
         // Flatten the array of arrays by one level
@@ -791,7 +799,7 @@ class SchemaMigrator
             // Skip tables that are not being renamed or where the new name isn't prefixed
             // with the deletion marker.
             if ($tableDiff->getNewName() === false
-                || !StringUtility::beginsWith($tableDiff->getNewName()->getName(), $this->deletedPrefix)
+                || strpos($tableDiff->getNewName()->getName(), $this->deletedPrefix) !== 0
             ) {
                 continue;
             }
@@ -1017,7 +1025,7 @@ class SchemaMigrator
         Connection $connection
     ): SchemaDiff {
         foreach ($schemaDiff->removedTables as $index => $removedTable) {
-            if (StringUtility::beginsWith($removedTable->getName(), $this->deletedPrefix)) {
+            if (strpos($removedTable->getName(), $this->deletedPrefix) === 0) {
                 continue;
             }
             $tableDiff = GeneralUtility::makeInstance(
@@ -1059,7 +1067,7 @@ class SchemaMigrator
             }
 
             foreach ($changedTable->removedColumns as $columnIndex => $removedColumn) {
-                if (StringUtility::beginsWith($removedColumn->getName(), $this->deletedPrefix)) {
+                if (strpos($removedColumn->getName(), $this->deletedPrefix) === 0) {
                     continue;
                 }
 
@@ -1157,7 +1165,7 @@ class SchemaMigrator
                 // If the tablename has a deleted prefix strip it of before comparing
                 // it against the list of valid table names so that drop operations
                 // don't get removed.
-                if (StringUtility::beginsWith($tableName, $this->deletedPrefix)) {
+                if (strpos($tableName, $this->deletedPrefix) === 0) {
                     $tableName = substr($tableName, strlen($this->deletedPrefix));
                 }
                 return in_array($tableName, $validTableNames, true)
@@ -1240,7 +1248,7 @@ class SchemaMigrator
     protected function getTableOptions(Connection $connection, array $tableNames): array
     {
         $tableOptions = [];
-        if (!StringUtility::beginsWith($connection->getServerVersion(), 'MySQL')) {
+        if (strpos($connection->getServerVersion(), 'MySQL') !== 0) {
             foreach ($tableNames as $tableName) {
                 $tableOptions[$tableName] = [];
             }
@@ -1259,8 +1267,14 @@ class SchemaMigrator
             )
             ->from('information_schema.TABLES')
             ->where(
-                $queryBuilder->expr()->eq('TABLE_TYPE', $queryBuilder->quote('BASE TABLE')),
-                $queryBuilder->expr()->eq('TABLE_SCHEMA', $queryBuilder->quote($connection->getDatabase()))
+                $queryBuilder->expr()->eq(
+                    'TABLE_TYPE',
+                    $queryBuilder->createNamedParameter('BASE TABLE', \PDO::PARAM_STR)
+                ),
+                $queryBuilder->expr()->eq(
+                    'TABLE_SCHEMA',
+                    $queryBuilder->createNamedParameter($connection->getDatabase(), \PDO::PARAM_STR)
+                )
             )
             ->execute();
 

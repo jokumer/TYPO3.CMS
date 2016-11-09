@@ -35,7 +35,8 @@ define(
 			doLayout: function () {
 				TYPO3.Backend.NavigationContainer.cleanup();
 				TYPO3.Backend.NavigationContainer.calculateScrollbar();
-				if (Ext.getCmp('typo3-pagetree') !== undefined) {
+				$('.t3js-topbar-header').css('padding-right', $('.t3js-scaffold-toolbar').outerWidth());
+				if (typeof Ext.getCmp('typo3-pagetree') !== 'undefined') {
 					Ext.getCmp('typo3-pagetree').doLayout();
 				}
 			},
@@ -53,6 +54,13 @@ define(
 				}
 			},
 			NavigationContainer: {
+				PageTree: {
+					refreshTree: function() {
+						if (typeof Ext.getCmp('typo3-pagetree') !== 'undefined') {
+							Ext.getCmp('typo3-pagetree').activeTree.refreshTree();
+						}
+					}
+				},
 				toggle: function () {
 					$('.t3js-scaffold').toggleClass('scaffold-content-navigation-expanded')
 				},
@@ -61,10 +69,12 @@ define(
 					$('t3js-scaffold-content').removeAttr('style');
 				},
 				hide: function () {
+					$('.t3js-topbar-button-navigationcomponent').css('visibility', 'hidden');
 					$('.t3js-scaffold').removeClass('scaffold-content-navigation-expanded');
 					$('.t3js-scaffold-content-module').removeAttr('style');
 				},
 				show: function (component) {
+					$('.t3js-topbar-button-navigationcomponent').css('visibility', 'visible');
 					if(component !== undefined) {
 						$('.t3js-scaffold').addClass('scaffold-content-navigation-expanded');
 					}
@@ -79,7 +89,7 @@ define(
 					return $('.t3js-scaffold-content-navigation-iframe').attr('src');
 				},
 				refresh: function() {
-					console.log('refresh navi');
+					$('.t3js-scaffold-content-navigation-iframe')[0].contentWindow.location.reload();
 				},
 				calculateScrollbar: function (){
 					TYPO3.Backend.NavigationContainer.cleanup();
@@ -105,6 +115,12 @@ define(
 			 * Contentcontainer
 			 */
 			ContentContainer: {
+				// @deprecated since TYPO3 v8, will be removed in v9.
+				// Use top.TYPO3.Backend.ContentContainer.get() instead of top.TYPO3.Backend.ContentContainer.iframe
+				'iframe': $('.t3js-scaffold-content-module-iframe')[0].contentWindow,
+				get: function() {
+					return $('.t3js-scaffold-content-module-iframe')[0].contentWindow;
+				},
 				setUrl: function (urlToLoad) {
 					TYPO3.Backend.Loader.start();
 					$('.t3js-scaffold-content-module-iframe')
@@ -114,10 +130,10 @@ define(
 						});
 				},
 				getUrl: function() {
-					return $('.t3js-scaffold-content-navigation-iframe').attr('src');
+					return $('.t3js-scaffold-content-module-iframe').attr('src');
 				},
 				refresh: function() {
-					console.log('refresh content');
+					$('.t3js-scaffold-content-module-iframe')[0].contentWindow.location.reload();
 				},
 				getIdFromUrl: function() {
 					if(this.getUrl) {
@@ -134,5 +150,3 @@ define(
 		return TYPO3.Backend;
 	}
 );
-
-

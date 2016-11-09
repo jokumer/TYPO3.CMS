@@ -17,13 +17,12 @@ namespace TYPO3\CMS\Backend\Form\Wizard;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
+use TYPO3\CMS\Core\Configuration\FlexForm\FlexFormTools;
 use TYPO3\CMS\Core\Database\ConnectionPool;
-use TYPO3\CMS\Core\Imaging\Icon;
-use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Utility\ArrayUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
-use TYPO3\CMS\Core\Utility\StringUtility;
+use TYPO3\CMS\Fluid\View\StandaloneView;
 use TYPO3\CMS\Lang\LanguageService;
 
 /**
@@ -31,27 +30,50 @@ use TYPO3\CMS\Lang\LanguageService;
  */
 class SuggestWizard
 {
+
+    /**
+     * @var StandaloneView
+     */
+    protected $view;
+
+    /**
+     * Construct
+     *
+     * @param StandaloneView $view
+     */
+    public function __construct(StandaloneView $view = null)
+    {
+        $this->view = $view ?: $this->getFluidTemplateObject('SuggestWizard.html');
+    }
+
     /**
      * Renders an ajax-enabled text field. Also adds required JS
      *
-     * @param string $fieldname The fieldname in the form
+     * @param string $fieldName The field name in the form
      * @param string $table The table we render this selector for
      * @param string $field The field we render this selector for
      * @param array $row The row which is currently edited
      * @param array $config The TSconfig of the field
+     * @param array $flexFormConfig If field is within flex form, this is the TCA config of the flex field
+     * @throws \RuntimeException for incomplete incoming arguments
      * @return string The HTML code for the selector
      */
-    public function renderSuggestSelector($fieldname, $table, $field, array $row, array $config)
+    public function renderSuggestSelector($fieldName, $table, $field, array $row, array $config, array $flexFormConfig = [])
     {
-        /** @var $iconFactory IconFactory */
-        $iconFactory = GeneralUtility::makeInstance(IconFactory::class);
-        $languageService = $this->getLanguageService();
-        $isFlexFormField = $GLOBALS['TCA'][$table]['columns'][$field]['config']['type'] === 'flex';
-        if ($isFlexFormField) {
+        $dataStructureIdentifier = '';
+        if (!empty($flexFormConfig) && $flexFormConfig['config']['type'] === 'flex') {
             $fieldPattern = 'data[' . $table . '][' . $row['uid'] . '][';
-            $flexformField = str_replace($fieldPattern, '', $fieldname);
+            $flexformField = str_replace($fieldPattern, '', $fieldName);
             $flexformField = substr($flexformField, 0, -1);
             $field = str_replace([']['], '|', $flexformField);
+            if (!isset($flexFormConfig['config']['dataStructureIdentifier'])) {
+                throw new \RuntimeException(
+                    'A data structure identifier must be set in [\'config\'] part of a flex form.'
+                    . ' This is usually added by TcaFlexPrepare data processor',
+                    1478604742
+                );
+            }
+            $dataStructureIdentifier = $flexFormConfig['config']['dataStructureIdentifier'];
         }
 
         // Get minimumCharacters from TCA
@@ -59,7 +81,7 @@ class SuggestWizard
         if (isset($config['fieldConf']['config']['wizards']['suggest']['default']['minimumCharacters'])) {
             $minChars = (int)$config['fieldConf']['config']['wizards']['suggest']['default']['minimumCharacters'];
         }
-        // Overwrite it with minimumCharacters from TSConfig (TCEFORM) if given
+        // Overwrite it with minimumCharacters from TSConfig if given
         if (isset($config['fieldTSConfig']['suggest.']['default.']['minimumCharacters'])) {
             $minChars = (int)$config['fieldTSConfig']['suggest.']['default.']['minimumCharacters'];
         }
@@ -71,33 +93,27 @@ class SuggestWizard
             $type = $config['fieldConf']['config']['type'];
         }
 
-        $jsRow = '';
-        if ($isFlexFormField || !MathUtility::canBeInterpretedAsInteger($row['uid'])) {
-            // Ff we have a new record, we hand that row over to JS.
-            // This way we can properly retrieve the configuration of our wizard
-            // if it is shown in a flexform
-            $jsRow = serialize($row);
-        }
+        // Sign those parameters that come back in an ajax request to configure the search in searchAction()
+        $hmac = GeneralUtility::hmac(
+            (string)$table . (string)$field . (string)$row['uid'] . (string)$row['pid'] . (string)$dataStructureIdentifier,
+            'formEngineSuggest'
+        );
 
-        $selector = '
-		<div class="autocomplete t3-form-suggest-container">
-			<div class="input-group">
-				<span class="input-group-addon">' . $iconFactory->getIcon('actions-search', Icon::SIZE_SMALL)->render() . '</span>
-				<input type="search" class="t3-form-suggest form-control"
-					placeholder="' . htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.findRecord')) . '"
-					data-fieldname="' . htmlspecialchars($fieldname) . '"
-					data-table="' . htmlspecialchars($table) . '"
-					data-field="' . htmlspecialchars($field) . '"
-					data-uid="' . htmlspecialchars($row['uid']) . '"
-					data-pid="' . (int)$row['pid'] . '"
-					data-fieldtype="' . htmlspecialchars($type) . '"
-					data-minchars="' . (int)$minChars . '"
-					data-recorddata="' . htmlspecialchars($jsRow) . '"
-				/>
-			</div>
-		</div>';
+        $this->view->assignMultiple([
+                'placeholder' => 'LLL:EXT:lang/locallang_core.xlf:labels.findRecord',
+                'fieldname' => $fieldName,
+                'table' => $table,
+                'field' => $field,
+                'uid' => $row['uid'],
+                'pid' => (int)$row['pid'],
+                'dataStructureIdentifier' => $dataStructureIdentifier,
+                'fieldtype' => $type,
+                'minchars' => (int)$minChars,
+                'hmac' => $hmac,
+            ]
+        );
 
-        return $selector;
+        return $this->view->render();
     }
 
     /**
@@ -105,36 +121,81 @@ class SuggestWizard
      *
      * @param ServerRequestInterface $request
      * @param ResponseInterface $response
+     * @throws \RuntimeException for incomplete or invalid arguments
      * @return ResponseInterface
      */
     public function searchAction(ServerRequestInterface $request, ResponseInterface $response)
     {
         $parsedBody = $request->getParsedBody();
-        $queryParams = $request->getQueryParams();
 
-        // Get parameters from $_GET/$_POST
-        $search = isset($parsedBody['value']) ? $parsedBody['value'] : $queryParams['value'];
-        $table = isset($parsedBody['table']) ? $parsedBody['table'] : $queryParams['table'];
-        $field = isset($parsedBody['field']) ? $parsedBody['field'] : $queryParams['field'];
-        $uid = isset($parsedBody['uid']) ? $parsedBody['uid'] : $queryParams['uid'];
-        $pageId = (int)(isset($parsedBody['pid']) ? $parsedBody['pid'] : $queryParams['pid']);
-        $newRecordRow = isset($parsedBody['newRecordRow']) ? $parsedBody['newRecordRow'] : $queryParams['newRecordRow'];
-        // If the $uid is numeric, we have an already existing element, so get the
-        // TSconfig of the page itself or the element container (for non-page elements)
-        // otherwise it's a new element, so use given id of parent page (i.e., don't modify it here)
-        if (is_numeric($uid)) {
-            $row = BackendUtility::getRecord($table, $uid);
-            if ($table === 'pages') {
-                $pageId = $uid;
-            } else {
-                $pageId = $row['pid'];
-            }
-        } else {
-            $row = unserialize($newRecordRow);
+        if (!isset($parsedBody['value'])
+            || !isset($parsedBody['table'])
+            || !isset($parsedBody['field'])
+            || !isset($parsedBody['uid'])
+            || !isset($parsedBody['dataStructureIdentifier'])
+            || !isset($parsedBody['hmac'])
+        ) {
+            throw new \RuntimeException(
+                'Missing at least one of the required arguments "value", "table", "field", "uid"'
+                . ', "dataStructureIdentifier" or "hmac"',
+                1478607036
+            );
         }
-        $TSconfig = BackendUtility::getPagesTSconfig($pageId);
-        $fieldConfig = $GLOBALS['TCA'][$table]['columns'][$field]['config'];
-        $this->overrideFieldNameAndConfigurationForFlexform($table, $field, $row, $fieldConfig);
+
+        $search = $parsedBody['value'];
+        $table = $parsedBody['table'];
+        $field = $parsedBody['field'];
+        $uid = $parsedBody['uid'];
+        $pid = (int)$parsedBody['pid'];
+
+        // flex form section container identifiers are created on js side dynamically "onClick". Those are
+        // not within the generated hmac ... the js side adds "idx{dateInMilliseconds}-", so this is removed here again.
+        // example outgoing in renderSuggestSelector():
+        // flex_1|data|sSuggestCheckCombination|lDEF|settings.subelements|el|ID-356586b0d3-form|item|el|content|vDEF
+        // incoming here:
+        // flex_1|data|sSuggestCheckCombination|lDEF|settings.subelements|el|ID-356586b0d3-idx1478611729574-form|item|el|content|vDEF
+        // Note: For existing containers, these parts are numeric, so "ID-356586b0d3-idx1478611729574-form" becomes 1 or 2, etc.
+        // @todo: This could be kicked is the flex form section containers are moved to an ajax call on creation
+        $fieldForHmac = preg_replace('/idx\d{13}-/', '', $field);
+
+        $dataStructureIdentifierString = '';
+        if (!empty($parsedBody['dataStructureIdentifier'])) {
+            $dataStructureIdentifierString = json_encode($parsedBody['dataStructureIdentifier']);
+        }
+
+        $incomingHmac = $parsedBody['hmac'];
+        $calculatedHmac = GeneralUtility::hmac(
+            $table . $fieldForHmac . $uid . $pid . $dataStructureIdentifierString,
+            'formEngineSuggest'
+        );
+        if ($incomingHmac !== $calculatedHmac) {
+            throw new \RuntimeException(
+                'Incoming and calculated hmac do not match',
+                1478608245
+            );
+        }
+
+        // If the $uid is numeric (existing page) and a suggest wizard in pages is handled, the effective
+        // pid is the uid of that page - important for page ts config configuration.
+        if (MathUtility::canBeInterpretedAsInteger($uid) && $table === 'pages') {
+            $pid = $uid;
+        }
+        $TSconfig = BackendUtility::getPagesTSconfig($pid);
+
+        // Determine TCA config of field
+        if (empty($dataStructureIdentifierString)) {
+            // Normal columns field
+            $fieldConfig = $GLOBALS['TCA'][$table]['columns'][$field]['config'];
+        } else {
+            // A flex flex form field
+            $flexFormTools = GeneralUtility::makeInstance(FlexFormTools::class);
+            $dataStructureArray = $flexFormTools->parseDataStructureByIdentifier($dataStructureIdentifierString);
+            $parts = explode('|', $field);
+            $fieldConfig = $this->getFieldConfiguration($parts, $dataStructureArray);
+            // Flexform field name levels are separated with | instead of encapsulation in [];
+            // reverse this here to be compatible with regular field names.
+            $field = str_replace('|', '][', $field);
+        }
 
         $wizardConfig = $fieldConfig['wizards']['suggest'];
 
@@ -160,7 +221,7 @@ class SuggestWizard
             if (isset($config['addWhere'])) {
                 $replacement = [
                     '###THIS_UID###' => (int)$uid,
-                    '###CURRENT_PID###' => (int)$pageId
+                    '###CURRENT_PID###' => (int)$pid
                 ];
                 if (isset($TSconfig['TCEFORM.'][$table . '.'][$field . '.'])) {
                     $fieldTSconfig = $TSconfig['TCEFORM.'][$table . '.'][$field . '.'];
@@ -225,7 +286,7 @@ class SuggestWizard
      */
     protected function currentBackendUserMayAccessTable(array $tableConfig)
     {
-        if ($GLOBALS['BE_USER']->isAdmin()) {
+        if ($this->getBackendUser()->isAdmin()) {
             return true;
         }
 
@@ -236,47 +297,6 @@ class SuggestWizard
 
         // allow access to root level pages if security restrictions should be bypassed
         return !$tableConfig['ctrl']['rootLevel'] || $tableConfig['ctrl']['security']['ignoreRootLevelRestriction'];
-    }
-
-    /**
-     * Checks if the query comes from a Flexform element and if yes, resolves the field configuration from the Flexform
-     * data structure.
-     *
-     * @param string $table
-     * @param string &$field The field identifier, either a simple table field or a Flexform field path separated with |
-     * @param array $row The row we're dealing with; optional (only required for Flexform records)
-     * @param array|NULL &$fieldConfig
-     */
-    protected function overrideFieldNameAndConfigurationForFlexform($table, &$field, array $row, &$fieldConfig)
-    {
-        // check if field is a flexform reference
-        if (strpos($field, '|') === false) {
-            $fieldConfig = $GLOBALS['TCA'][$table]['columns'][$field]['config'];
-        } else {
-            $parts = explode('|', $field);
-            if ($GLOBALS['TCA'][$table]['columns'][$parts[0]]['config']['type'] !== 'flex') {
-                return;
-            }
-
-            $flexfieldTCAConfig = $GLOBALS['TCA'][$table]['columns'][$parts[0]]['config'];
-            // @todo: should be done via data preparation, resolveAllSheetsInDS() can be deprecated then
-            if (substr($row['uid'], 0, 3) === 'NEW') {
-                // We have to cleanup record information as they are coming from FormEngines DataProvider
-                $pointerFields = GeneralUtility::trimExplode(',', $flexfieldTCAConfig['ds_pointerField']);
-                foreach ($pointerFields as $pointerField) {
-                    if (is_array($row[$pointerField])) {
-                        $row[$pointerField] = $row[$pointerField][0];
-                    }
-                }
-            }
-            $flexformDSArray = BackendUtility::getFlexFormDS($flexfieldTCAConfig, $row, $table, $parts[0]);
-            $flexformDSArray = GeneralUtility::resolveAllSheetsInDS($flexformDSArray);
-
-            $fieldConfig = $this->getFieldConfiguration($parts, $flexformDSArray);
-            // Flexform field name levels are separated with | instead of encapsulation in [];
-            // reverse this here to be compatible with regular field names.
-            $field = str_replace('|', '][', $field);
-        }
     }
 
     /**
@@ -372,7 +392,7 @@ class SuggestWizard
     protected function isRelevantFlexField($fieldName)
     {
         return !(
-            StringUtility::beginsWith($fieldName, 'ID-') ||
+            strpos($fieldName, 'ID-') === 0 ||
             $fieldName === 'lDEF' ||
             $fieldName === 'vDEF' ||
             $fieldName === 'data' ||
@@ -509,5 +529,38 @@ class SuggestWizard
     protected function getLanguageService()
     {
         return $GLOBALS['LANG'];
+    }
+
+    /**
+     * Returns a new standalone view, shorthand function
+     *
+     * @param string $filename Which templateFile should be used.
+     *
+     * @return StandaloneView
+     */
+    protected function getFluidTemplateObject(string $filename = null):StandaloneView
+    {
+        /** @var StandaloneView $view */
+        $view = GeneralUtility::makeInstance(StandaloneView::class);
+        $view->setLayoutRootPaths([GeneralUtility::getFileAbsFileName('EXT:backend/Resources/Private/Layouts')]);
+        $view->setPartialRootPaths([GeneralUtility::getFileAbsFileName('EXT:backend/Resources/Private/Partials')]);
+        $view->setTemplateRootPaths([GeneralUtility::getFileAbsFileName('EXT:backend/Resources/Private/Templates')]);
+
+        if ($filename === null) {
+            $filename = 'SuggestWizard.html';
+        }
+
+        $view->setTemplatePathAndFilename(GeneralUtility::getFileAbsFileName('EXT:backend/Resources/Private/Templates/Wizards/' . $filename));
+
+        $view->getRequest()->setControllerExtensionName('Backend');
+        return $view;
+    }
+
+    /**
+     * @return \TYPO3\CMS\Core\Authentication\BackendUserAuthentication
+     */
+    protected function getBackendUser()
+    {
+        return $GLOBALS['BE_USER'];
     }
 }

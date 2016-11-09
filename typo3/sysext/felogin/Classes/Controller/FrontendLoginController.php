@@ -15,10 +15,10 @@ namespace TYPO3\CMS\Felogin\Controller;
  */
 
 use TYPO3\CMS\Core\Crypto\Random;
+use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\FrontendRestrictionContainer;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Core\Utility\StringUtility;
 
 /**
  * Plugin 'Website User Login' for the 'felogin' extension.
@@ -229,14 +229,20 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                         $queryBuilder->expr()->orX(
                             $queryBuilder->expr()->eq(
                                 'email',
-                                $queryBuilder->createNamedParameter($this->piVars['forgot_email'])
+                                $queryBuilder->createNamedParameter($this->piVars['forgot_email'], \PDO::PARAM_STR)
                             ),
                             $queryBuilder->expr()->eq(
                                 'username',
-                                $queryBuilder->createNamedParameter($this->piVars['forgot_email'])
+                                $queryBuilder->createNamedParameter($this->piVars['forgot_email'], \PDO::PARAM_STR)
                             )
                         ),
-                        $queryBuilder->expr()->in('pid', GeneralUtility::intExplode(',', $this->spid))
+                        $queryBuilder->expr()->in(
+                            'pid',
+                            $queryBuilder->createNamedParameter(
+                                GeneralUtility::intExplode(',', $this->spid),
+                                Connection::PARAM_INT_ARRAY
+                            )
+                        )
                     )
                     ->execute()
                     ->fetch();
@@ -363,7 +369,12 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                             ->set('password', $newPass)
                             ->set('felogin_forgotHash', '')
                             ->set('tstamp', (int)$GLOBALS['EXEC_TIME'])
-                            ->where($queryBuilder->expr()->eq('uid', (int)$user['uid']))
+                            ->where(
+                                $queryBuilder->expr()->eq(
+                                    'uid',
+                                    $queryBuilder->createNamedParameter($user['uid'], \PDO::PARAM_INT)
+                                )
+                            )
                             ->execute();
 
                         $markerArray['###STATUS_MESSAGE###'] = $this->getDisplayText(
@@ -419,7 +430,12 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
         $queryBuilder->getRestrictions()->removeAll();
         $queryBuilder->update($userTable)
             ->set('felogin_forgotHash', $randHashDB)
-            ->where($queryBuilder->expr()->eq('uid', (int)$user['uid']))
+            ->where(
+                $queryBuilder->expr()->eq(
+                    'uid',
+                    $queryBuilder->createNamedParameter($user['uid'], \PDO::PARAM_INT)
+                )
+            )
             ->execute();
 
         // Send hashlink to user
@@ -669,8 +685,17 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                                     ->select('felogin_redirectPid')
                                     ->from($userGroupTable)
                                     ->where(
-                                        $queryBuilder->expr()->neq('felogin_redirectPid', $queryBuilder->quote('')),
-                                        $queryBuilder->expr()->in('uid', array_map('intval', $groupData['uid']))
+                                        $queryBuilder->expr()->neq(
+                                            'felogin_redirectPid',
+                                            $queryBuilder->createNamedParameter('', \PDO::PARAM_STR)
+                                        ),
+                                        $queryBuilder->expr()->in(
+                                            'uid',
+                                            $queryBuilder->createNamedParameter(
+                                                $groupData['uid'],
+                                                Connection::PARAM_INT_ARRAY
+                                            )
+                                        )
                                     )
                                     ->execute()
                                     ->fetch();
@@ -689,10 +714,16 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                                 ->select('felogin_redirectPid')
                                 ->from($userTable)
                                 ->where(
-                                    $queryBuilder->expr()->neq('felogin_redirectPid', $queryBuilder->quote('')),
+                                    $queryBuilder->expr()->neq(
+                                        'felogin_redirectPid',
+                                        $queryBuilder->createNamedParameter('', \PDO::PARAM_STR)
+                                    ),
                                     $queryBuilder->expr()->eq(
                                         $this->frontendController->fe_user->userid_column,
-                                        (int)$this->frontendController->fe_user->user['uid']
+                                        $queryBuilder->createNamedParameter(
+                                            $this->frontendController->fe_user->user['uid'],
+                                            \PDO::PARAM_INT
+                                        )
                                     )
                                 )
                                 ->execute()
@@ -1010,8 +1041,8 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
     {
         $urlWithoutSchema = preg_replace('#^https?://#', '', $url);
         $siteUrlWithoutSchema = preg_replace('#^https?://#', '', GeneralUtility::getIndpEnv('TYPO3_SITE_URL'));
-        return StringUtility::beginsWith($urlWithoutSchema . '/', GeneralUtility::getIndpEnv('HTTP_HOST') . '/')
-            && StringUtility::beginsWith($urlWithoutSchema, $siteUrlWithoutSchema);
+        return strpos($urlWithoutSchema . '/', GeneralUtility::getIndpEnv('HTTP_HOST') . '/') === 0
+            && strpos($urlWithoutSchema, $siteUrlWithoutSchema) === 0;
     }
 
     /**

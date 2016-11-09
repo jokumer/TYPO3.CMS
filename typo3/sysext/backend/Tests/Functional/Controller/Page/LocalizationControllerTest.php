@@ -90,10 +90,17 @@ class LocalizationControllerTest extends FunctionalTestCase
             ->from('tt_content')
             ->where(
                 $queryBuilder->expr()->andX(
-                    $queryBuilder->expr()->eq('pid', 1),
-                    $queryBuilder->expr()->eq('sys_language_uid', 1)
+                    $queryBuilder->expr()->eq(
+                        'pid',
+                        $queryBuilder->createNamedParameter(1, \PDO::PARAM_INT)
+                    ),
+                    $queryBuilder->expr()->eq(
+                        'sys_language_uid',
+                        $queryBuilder->createNamedParameter(1, \PDO::PARAM_INT)
+                    )
                 )
-            )->execute()
+            )
+            ->execute()
             ->fetchAll();
         $this->assertSame($expectedResults, $results);
     }
@@ -119,19 +126,19 @@ class LocalizationControllerTest extends FunctionalTestCase
                 'pid' => 1,
                 'sys_language_uid' => 2,
                 'l18n_parent' => 1,
-                'header' => 'Test indhold 1 (copy 1)',
+                'header' => '[Translate to Deutsch:] Test indhold 1',
             ],
             [
                 'pid' => 1,
                 'sys_language_uid' => 2,
                 'l18n_parent' => 2,
-                'header' => 'Test indhold 2 (copy 1)',
+                'header' => '[Translate to Deutsch:] Test indhold 2',
             ],
             [
                 'pid' => 1,
                 'sys_language_uid' => 2,
                 'l18n_parent' => 3,
-                'header' => 'Test indhold 3 (copy 1)',
+                'header' => '[Translate to Deutsch:] Test indhold 3',
             ],
         ];
         $queryBuilder = (new ConnectionPool())->getQueryBuilderForTable('tt_content');
@@ -141,10 +148,17 @@ class LocalizationControllerTest extends FunctionalTestCase
             ->from('tt_content')
             ->where(
                 $queryBuilder->expr()->andX(
-                    $queryBuilder->expr()->eq('pid', 1),
-                    $queryBuilder->expr()->eq('sys_language_uid', 2)
+                    $queryBuilder->expr()->eq(
+                        'pid',
+                        $queryBuilder->createNamedParameter(1, \PDO::PARAM_INT)
+                    ),
+                    $queryBuilder->expr()->eq(
+                        'sys_language_uid',
+                        $queryBuilder->createNamedParameter(2, \PDO::PARAM_INT)
+                    )
                 )
-            )->execute()
+            )
+            ->execute()
             ->fetchAll();
         $this->assertSame($expectedResults, $results);
     }
@@ -190,10 +204,17 @@ class LocalizationControllerTest extends FunctionalTestCase
             ->from('tt_content')
             ->where(
                 $queryBuilder->expr()->andX(
-                    $queryBuilder->expr()->eq('pid', 1),
-                    $queryBuilder->expr()->eq('sys_language_uid', 2)
+                    $queryBuilder->expr()->eq(
+                        'pid',
+                        $queryBuilder->createNamedParameter(1, \PDO::PARAM_INT)
+                    ),
+                    $queryBuilder->expr()->eq(
+                        'sys_language_uid',
+                        $queryBuilder->createNamedParameter(2, \PDO::PARAM_INT)
+                    )
                 )
-            )->execute()
+            )
+            ->execute()
             ->fetchAll();
         $this->assertSame($expectedResults, $results);
     }
@@ -241,10 +262,17 @@ class LocalizationControllerTest extends FunctionalTestCase
             ->from('tt_content')
             ->where(
                 $queryBuilder->expr()->andX(
-                    $queryBuilder->expr()->eq('pid', 1),
-                    $queryBuilder->expr()->eq('sys_language_uid', 2)
+                    $queryBuilder->expr()->eq(
+                        'pid',
+                        $queryBuilder->createNamedParameter(1, \PDO::PARAM_INT)
+                    ),
+                    $queryBuilder->expr()->eq(
+                        'sys_language_uid',
+                        $queryBuilder->createNamedParameter(2, \PDO::PARAM_INT)
+                    )
                 )
-            )->execute()
+            )
+            ->execute()
             ->fetchAll();
         $this->assertSame($expectedResults, $results);
     }
@@ -322,8 +350,14 @@ class LocalizationControllerTest extends FunctionalTestCase
             ->from('tt_content')
             ->where(
                 $queryBuilder->expr()->andX(
-                    $queryBuilder->expr()->eq('pid', 1),
-                    $queryBuilder->expr()->eq('sys_language_uid', 1)
+                    $queryBuilder->expr()->eq(
+                        'pid',
+                        $queryBuilder->createNamedParameter(1, \PDO::PARAM_INT)
+                    ),
+                    $queryBuilder->expr()->eq(
+                        'sys_language_uid',
+                        $queryBuilder->createNamedParameter(1, \PDO::PARAM_INT)
+                    )
                 )
             )->orderBy('sorting', 'ASC')
             ->execute()

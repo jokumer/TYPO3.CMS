@@ -14,9 +14,10 @@ namespace TYPO3\CMS\Install\SystemEnvironment;
  * The TYPO3 project - inspiring people to share!
  */
 
+use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Core\Utility\StringUtility;
 use TYPO3\CMS\Install\Status;
 
 /**
@@ -49,7 +50,7 @@ class DatabaseCheck
         $statusArray = [];
         $defaultConnection = GeneralUtility::makeInstance(ConnectionPool::class)
             ->getConnectionByName(ConnectionPool::DEFAULT_CONNECTION_NAME);
-        if (!StringUtility::beginsWith($defaultConnection->getServerVersion(), 'MySQL')) {
+        if (strpos($defaultConnection->getServerVersion(), 'MySQL') !== 0) {
             return $statusArray;
         }
         $statusArray[] = $this->checkMysqlVersion($defaultConnection);
@@ -114,22 +115,26 @@ class DatabaseCheck
     /**
      * Checks the character set of the database and reports an error if it is not utf-8.
      *
-     * @param Connection Connection to the database to be checked
+     * @param Connection $connection to the database to be checked
      * @return Status\StatusInterface
      */
-    protected function checkMysqlDatabaseUtf8Status($connection)
+    protected function checkMysqlDatabaseUtf8Status(Connection $connection)
     {
+        /** @var QueryBuilder $queryBuilder */
         $queryBuilder = $connection->createQueryBuilder();
         $defaultDatabaseCharset = (string)$queryBuilder->select('DEFAULT_CHARACTER_SET_NAME')
             ->from('information_schema.SCHEMATA')
             ->where(
-                $queryBuilder->expr()->eq('SCHEMA_NAME', $queryBuilder->quote($connection->getDatabase()))
+                $queryBuilder->expr()->eq(
+                    'SCHEMA_NAME',
+                    $queryBuilder->createNamedParameter($connection->getDatabase(), \PDO::PARAM_STR)
+                )
             )
             ->setMaxResults(1)
             ->execute()
             ->fetchColumn();
         // also allow utf8mb4
-        if (!StringUtility::beginsWith($defaultDatabaseCharset, 'utf8')) {
+        if (strpos($defaultDatabaseCharset, 'utf8') !== 0) {
             $status = new Status\ErrorStatus();
             $status->setTitle('MySQL database character set check failed');
             $status->setMessage(

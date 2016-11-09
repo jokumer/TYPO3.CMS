@@ -15,7 +15,6 @@ namespace TYPO3\CMS\Core\Migrations;
  */
 
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Core\Utility\StringUtility;
 
 /**
  * Migrate TCA from old to new syntax. Used in bootstrap and Flex Form Data Structures.
@@ -57,6 +56,7 @@ class TcaMigration
         $tca = $this->migrateSelectTreeOptions($tca);
         $tca = $this->migrateTSconfigSoftReferences($tca);
         $tca = $this->migrateShowIfRteOption($tca);
+        $tca = $this->migrateWorkspacesOptions($tca);
         // @todo: if showitem/defaultExtras wizards[xy] is migrated to columnsOverrides here, enableByTypeConfig could be dropped
         return $tca;
     }
@@ -432,12 +432,12 @@ class TcaMigration
                             $path = implode('/', $pathParts);
                             // If the path starts with ext/ or sysext/ migrate it
                             if (
-                                StringUtility::beginsWith($itemConfig[2], 'ext/')
-                                || StringUtility::beginsWith($itemConfig[2], 'sysext/')
+                                strpos($itemConfig[2], 'ext/') === 0
+                                || strpos($itemConfig[2], 'sysext/') === 0
                             ) {
                                 $this->messages[] = '[' . $tcaPath . '] ext/ or sysext/ within the path (' . $path . ') in items array is deprecated, use EXT: reference';
                                 $itemConfig[2] = 'EXT:' . $path;
-                            } elseif (StringUtility::beginsWith($itemConfig[2], 'i/')) {
+                            } elseif (strpos($itemConfig[2], 'i/') === 0) {
                                 $this->messages[] = '[' . $tcaPath . '] i/ within the path (' . $path . ') in items array is deprecated, use EXT: reference';
                                 $itemConfig[2] = 'EXT:t3skin/icons/gfx/' . $itemConfig[2];
                             }
@@ -489,7 +489,7 @@ class TcaMigration
             if (!isset($tableDefinition['ctrl']['iconfile'])) {
                 continue;
             }
-            if (StringUtility::beginsWith($tableDefinition['ctrl']['iconfile'], '../typo3conf/ext/')) {
+            if (strpos($tableDefinition['ctrl']['iconfile'], '../typo3conf/ext/') === 0) {
                 $tableDefinition['ctrl']['iconfile'] = str_replace('../typo3conf/ext/', 'EXT:', $tableDefinition['ctrl']['iconfile']);
                 $tcaPath = implode('.', [$table, 'ctrl', 'iconfile']);
                 $this->messages[] = '[' . $tcaPath . '] relative path to ../typo3conf/ext/ is deprecated, use EXT: instead';
@@ -845,6 +845,29 @@ class TcaMigration
                             . 'in TCA ' . $table . '[\'columns\'][\'' . $fieldName . '\'][\'config\']';
                     }
                 }
+            }
+        }
+        return $tca;
+    }
+
+    /**
+     * Casts "versioningWS" to bool, and removes "versioning_followPages"
+     *
+     * @param array $tca Incoming TCA
+     * @return array Migrated TCA
+     */
+    protected function migrateWorkspacesOptions(array $tca)
+    {
+        foreach ($tca as $table => &$tableDefinition) {
+            if (isset($tableDefinition['ctrl']['versioningWS']) && !is_bool($tableDefinition['ctrl']['versioningWS'])) {
+                $tableDefinition['ctrl']['versioningWS'] = (bool)$tableDefinition['ctrl']['versioningWS'];
+                $this->messages[] = 'The TCA setting \'versioningWS\' was set to a boolean value '
+                    . 'in TCA ' . $table . '[\'ctrl\'][\'versioningWS\']';
+            }
+            if (isset($tableDefinition['ctrl']['versioning_followPages']) && !empty($tableDefinition['ctrl']['versioning_followPages'])) {
+                unset($tableDefinition['ctrl']['versioning_followPages']);
+                $this->messages[] = 'The TCA setting \'versioning_followPages\' was removed as it is unused '
+                    . 'in TCA ' . $table . '[\'ctrl\'][\'versioning_followPages\']';
             }
         }
         return $tca;

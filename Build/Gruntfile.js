@@ -151,9 +151,6 @@ module.exports = function(grunt) {
 				]
 			}
 		},
-		typings: {
-			install: {}
-		},
 		watch: {
 			options: {
 				livereload: true
@@ -221,6 +218,15 @@ module.exports = function(grunt) {
 					{ dest: '<%= paths.sysext %>workspaces/Resources/Public/Icons/module-workspaces.svg', src: '<%= paths.t3icons %>module/module-workspaces.svg' }
 				]
 			},
+			fonts: {
+				files: [
+					{ dest: '<%= paths.sysext %>backend/Resources/Public/Fonts/FontAwesome/fontawesome-webfont.eot', src: '<%= paths.bower %>fontawesome/fonts/fontawesome-webfont.eot' },
+					{ dest: '<%= paths.sysext %>backend/Resources/Public/Fonts/FontAwesome/fontawesome-webfont.svg', src: '<%= paths.bower %>fontawesome/fonts/fontawesome-webfont.svg' },
+					{ dest: '<%= paths.sysext %>backend/Resources/Public/Fonts/FontAwesome/fontawesome-webfont.ttf', src: '<%= paths.bower %>fontawesome/fonts/fontawesome-webfont.ttf' },
+					{ dest: '<%= paths.sysext %>backend/Resources/Public/Fonts/FontAwesome/fontawesome-webfont.woff', src: '<%= paths.bower %>fontawesome/fonts/fontawesome-webfont.woff' },
+					{ dest: '<%= paths.sysext %>backend/Resources/Public/Fonts/FontAwesome/fontawesome-webfont.woff2', src: '<%= paths.bower %>fontawesome/fonts/fontawesome-webfont.woff2' }
+				]
+			},
 			npm: {
 				files: [
 					{dest: '<%= paths.install %>Public/JavaScript/tagsort.min.js', src: '<%= paths.npm %>tagsort/tagsort.js'}
@@ -275,8 +281,8 @@ module.exports = function(grunt) {
 					/**
 					 * copy needed parts of jquery
 					 */
-					'jquery/jquery-2.2.3.js': 'jquery/dist/jquery.js',
-					'jquery/jquery-2.2.3.min.js': 'jquery/dist/jquery.min.js',
+					'jquery/jquery-3.1.1.js': 'jquery/dist/jquery.js',
+					'jquery/jquery-3.1.1.min.js': 'jquery/dist/jquery.min.js',
 					/**
 					 * copy needed parts of jquery-ui
 					 */
@@ -306,7 +312,8 @@ module.exports = function(grunt) {
 					"<%= paths.core %>Public/JavaScript/Contrib/jquery-ui/selectable.js": ["<%= paths.core %>Public/JavaScript/Contrib/jquery-ui/selectable.js"],
 					"<%= paths.core %>Public/JavaScript/Contrib/jquery-ui/sortable.js": ["<%= paths.core %>Public/JavaScript/Contrib/jquery-ui/sortable.js"],
 					"<%= paths.core %>Public/JavaScript/Contrib/jquery-ui/widget.js": ["<%= paths.core %>Public/JavaScript/Contrib/jquery-ui/widget.js"],
-					"<%= paths.install %>Public/JavaScript/tagsort.min.js": ["<%= paths.install %>Public/JavaScript/tagsort.min.js"]
+					"<%= paths.install %>Public/JavaScript/tagsort.min.js": ["<%= paths.install %>Public/JavaScript/tagsort.min.js"],
+					"<%= paths.core %>Public/JavaScript/Contrib/bootstrap-datetimepicker.js": ["<%= paths.core %>Public/JavaScript/Contrib/bootstrap-datetimepicker.js"]
 				}
 			}
 		},
@@ -340,10 +347,8 @@ module.exports = function(grunt) {
 	grunt.loadNpmTasks('grunt-svgmin');
 	grunt.loadNpmTasks('grunt-postcss');
 	grunt.loadNpmTasks('grunt-contrib-copy');
-	grunt.loadNpmTasks('grunt-copy');
 	grunt.loadNpmTasks("grunt-ts");
 	grunt.loadNpmTasks('grunt-tslint');
-	grunt.loadNpmTasks('grunt-typings');
 
 	/**
 	 * grunt default task
@@ -372,11 +377,10 @@ module.exports = function(grunt) {
 	 *
 	 * this task does the following things:
 	 * - npm install
-	 * - typings install
 	 * - bower install
 	 * - copy some bower components to a specific destinations because they need to be included via PHP
 	 */
-	grunt.registerTask('update', ['npm-install', 'typings', 'bower_install', 'bowercopy']);
+	grunt.registerTask('update', ['npm-install', 'bower_install', 'bowercopy']);
 
 	/**
 	 * grunt scripts task
@@ -388,7 +392,11 @@ module.exports = function(grunt) {
 	 * - 2) Compiles all TypeScript files (*.ts) which are located in sysext/<EXTKEY>/Resources/Private/TypeScript/*.ts
 	 * - 3) Copy all generated JavaScript and Map files to public folders
 	 */
-	grunt.registerTask('scripts', ['tslint', 'ts', 'copy:ts_files']);
+	grunt.registerTask('scripts', ['tslint', 'tsclean', 'ts', 'copy:ts_files']);
+
+	grunt.task.registerTask('tsclean', function() {
+		grunt.file.delete("JavaScript");
+	});
 
 	/**
 	 * grunt build task

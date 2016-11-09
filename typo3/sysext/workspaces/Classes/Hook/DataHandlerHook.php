@@ -22,7 +22,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Workspaces\Service\StagesService;
 
 /**
- * Tcemain service
+ * DataHandler service
  */
 class DataHandlerHook
 {
@@ -35,10 +35,10 @@ class DataHandlerHook
      * @param string $table
      * @param string $id
      * @param string $value
-     * @param \TYPO3\CMS\Core\DataHandling\DataHandler $tcemain
+     * @param \TYPO3\CMS\Core\DataHandling\DataHandler $dataHandler
      * @return void
      */
-    public function processCmdmap_postProcess($command, $table, $id, $value, \TYPO3\CMS\Core\DataHandling\DataHandler $tcemain)
+    public function processCmdmap_postProcess($command, $table, $id, $value, \TYPO3\CMS\Core\DataHandling\DataHandler $dataHandler)
     {
         if ($command === 'delete') {
             if ($table === StagesService::TABLE_STAGE) {
@@ -53,12 +53,12 @@ class DataHandlerHook
      * hook that is called AFTER all commands of the commandmap was
      * executed
      *
-     * @param \TYPO3\CMS\Core\DataHandling\DataHandler $tcemainObj reference to the main tcemain object
+     * @param \TYPO3\CMS\Core\DataHandling\DataHandler $dataHandler reference to the main DataHandler object
      * @return void
      */
-    public function processCmdmap_afterFinish(\TYPO3\CMS\Core\DataHandling\DataHandler $tcemainObj)
+    public function processCmdmap_afterFinish(\TYPO3\CMS\Core\DataHandling\DataHandler $dataHandler)
     {
-        $this->flushWorkspaceCacheEntriesByWorkspaceId($tcemainObj->BE_USER->workspace);
+        $this->flushWorkspaceCacheEntriesByWorkspaceId($dataHandler->BE_USER->workspace);
     }
 
     /**
@@ -80,9 +80,18 @@ class DataHandlerHook
                     ->update($tcaTable)
                     ->set('t3ver_stage', StagesService::STAGE_EDIT_ID)
                     ->where(
-                        $queryBuilder->expr()->eq('t3ver_stage', (int)$stageId),
-                        $queryBuilder->expr()->eq('pid', -1),
-                        $queryBuilder->expr()->gt('t3ver_wsid', 0)
+                        $queryBuilder->expr()->eq(
+                            't3ver_stage',
+                            $queryBuilder->createNamedParameter($stageId, \PDO::PARAM_INT)
+                        ),
+                        $queryBuilder->expr()->eq(
+                            'pid',
+                            $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)
+                        ),
+                        $queryBuilder->expr()->gt(
+                            't3ver_wsid',
+                            $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT)
+                        )
                     )
                     ->execute();
             }
@@ -119,9 +128,9 @@ class DataHandlerHook
             }
         }
         if (!empty($command)) {
-            $tceMain = $this->getTceMain();
-            $tceMain->start([], $command);
-            $tceMain->process_cmdmap();
+            $dataHandler = $this->getDataHandler();
+            $dataHandler->start([], $command);
+            $dataHandler->process_cmdmap();
         }
     }
 
@@ -138,7 +147,7 @@ class DataHandlerHook
     /**
      * @return \TYPO3\CMS\Core\DataHandling\DataHandler
      */
-    protected function getTceMain()
+    protected function getDataHandler()
     {
         return \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Core\DataHandling\DataHandler::class);
     }

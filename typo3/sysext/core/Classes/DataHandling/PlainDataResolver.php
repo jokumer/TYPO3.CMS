@@ -15,6 +15,7 @@ namespace TYPO3\CMS\Core\DataHandling;
  */
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
+use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Versioning\VersionState;
@@ -94,30 +95,36 @@ class PlainDataResolver
      * Sets whether live IDs shall be kept in the final result set.
      *
      * @param bool $keepLiveIds
+     * @return PlainDataResolver
      */
     public function setKeepLiveIds($keepLiveIds)
     {
         $this->keepLiveIds = (bool)$keepLiveIds;
+        return $this;
     }
 
     /**
      * Sets whether delete placeholders shall be kept in the final result set.
      *
      * @param bool $keepDeletePlaceholder
+     * @return PlainDataResolver
      */
     public function setKeepDeletePlaceholder($keepDeletePlaceholder)
     {
         $this->keepDeletePlaceholder = (bool)$keepDeletePlaceholder;
+        return $this;
     }
 
     /**
      * Sets whether move placeholders shall be kept in case they cannot be substituted.
      *
      * @param bool $keepMovePlaceholder
+     * @return PlainDataResolver
      */
     public function setKeepMovePlaceholder($keepMovePlaceholder)
     {
         $this->keepMovePlaceholder = (bool)$keepMovePlaceholder;
+        return $this;
     }
 
     /**
@@ -129,9 +136,15 @@ class PlainDataResolver
             return $this->resolvedIds;
         }
 
-        $ids = $this->processVersionOverlays($this->liveIds);
-        $ids = $this->processSorting($ids);
-        $ids = $this->applyLiveIds($ids);
+        $ids = $this->reindex(
+            $this->processVersionOverlays($this->liveIds)
+        );
+        $ids = $this->reindex(
+            $this->processSorting($ids)
+        );
+        $ids = $this->reindex(
+            $this->applyLiveIds($ids)
+        );
 
         $this->resolvedIds = $ids;
         return $this->resolvedIds;
@@ -142,14 +155,17 @@ class PlainDataResolver
      *
      * @param int[] $ids
      * @return int[]
+     * @internal
      */
-    protected function processVersionOverlays(array $ids)
+    public function processVersionOverlays(array $ids)
     {
         if (empty($this->workspaceId) || !$this->isWorkspaceEnabled() || empty($ids)) {
             return $ids;
         }
 
-        $ids = $this->processVersionMovePlaceholders($ids);
+        $ids = $this->reindex(
+            $this->processVersionMovePlaceholders($ids)
+        );
         $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
             ->getQueryBuilderForTable($this->tableName);
 
@@ -159,9 +175,15 @@ class PlainDataResolver
             ->select('uid', 't3ver_oid', 't3ver_state')
             ->from($this->tableName)
             ->where(
-                $queryBuilder->expr()->eq('pid', -1),
-                $queryBuilder->expr()->in('t3ver_oid', array_map('intval', $ids)),
-                $queryBuilder->expr()->eq('t3ver_wsid', $this->workspaceId)
+                $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)),
+                $queryBuilder->expr()->in(
+                    't3ver_oid',
+                    $queryBuilder->createNamedParameter($ids, Connection::PARAM_INT_ARRAY)
+                ),
+                $queryBuilder->expr()->eq(
+                    't3ver_wsid',
+                    $queryBuilder->createNamedParameter($this->workspaceId, \PDO::PARAM_INT)
+                )
             )
             ->execute();
 
@@ -178,7 +200,6 @@ class PlainDataResolver
                 }
             }
         }
-        $ids = $this->reindex($ids);
 
         return $ids;
     }
@@ -188,8 +209,9 @@ class PlainDataResolver
      *
      * @param int[] $ids
      * @return int[]
+     * @internal
      */
-    protected function processVersionMovePlaceholders(array $ids)
+    public function processVersionMovePlaceholders(array $ids)
     {
         // Early return on insufficient data-set
         if (empty($this->workspaceId) || !$this->isWorkspaceEnabled() || empty($ids)) {
@@ -205,10 +227,19 @@ class PlainDataResolver
             ->select('uid', 't3ver_move_id')
             ->from($this->tableName)
             ->where(
-                $queryBuilder->expr()->neq('pid', -1),
-                $queryBuilder->expr()->eq('t3ver_state', VersionState::MOVE_PLACEHOLDER),
-                $queryBuilder->expr()->eq('t3ver_wsid', $this->workspaceId),
-                $queryBuilder->expr()->in('t3ver_move_id', array_map('intval', $ids))
+                $queryBuilder->expr()->neq('pid', $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)),
+                $queryBuilder->expr()->eq(
+                    't3ver_state',
+                    $queryBuilder->createNamedParameter((string)VersionState::MOVE_PLACEHOLDER, \PDO::PARAM_INT)
+                ),
+                $queryBuilder->expr()->eq(
+                    't3ver_wsid',
+                    $queryBuilder->createNamedParameter($this->workspaceId, \PDO::PARAM_INT)
+                ),
+                $queryBuilder->expr()->in(
+                    't3ver_move_id',
+                    $queryBuilder->createNamedParameter($ids, Connection::PARAM_INT_ARRAY)
+                )
             )
             ->execute();
 
@@ -225,8 +256,6 @@ class PlainDataResolver
             }
         }
 
-        $ids = $this->reindex($ids);
-
         return $ids;
     }
 
@@ -236,8 +265,9 @@ class PlainDataResolver
      *
      * @param int[] $ids
      * @return int[]
+     * @internal
      */
-    protected function processSorting(array $ids)
+    public function processSorting(array $ids)
     {
         // Early return on missing sorting statement or insufficient data-set
         if (empty($this->sortingStatement) || count($ids) < 2) {
@@ -253,7 +283,10 @@ class PlainDataResolver
             ->select('uid')
             ->from($this->tableName)
             ->where(
-                $queryBuilder->expr()->in('uid', array_map('intval', $ids))
+                $queryBuilder->expr()->in(
+                    'uid',
+                    $queryBuilder->createNamedParameter($ids, Connection::PARAM_INT_ARRAY)
+                )
             );
 
         if (!empty($this->sortingStatement)) {
@@ -264,7 +297,7 @@ class PlainDataResolver
 
         $sortedIds = $queryBuilder->execute()->fetchAll();
 
-        return $this->reindex(array_column($sortedIds, 'uid'));
+        return array_column($sortedIds, 'uid');
     }
 
     /**
@@ -274,8 +307,9 @@ class PlainDataResolver
      *
      * @param int[] $ids
      * @return int[]
+     * @internal
      */
-    protected function applyLiveIds(array $ids)
+    public function applyLiveIds(array $ids)
     {
         if (!$this->keepLiveIds || !$this->isWorkspaceEnabled() || empty($ids)) {
             return $ids;
@@ -290,7 +324,10 @@ class PlainDataResolver
             ->select('uid', 't3ver_oid')
             ->from($this->tableName)
             ->where(
-                $queryBuilder->expr()->in('uid', array_map('intval', $ids))
+                $queryBuilder->expr()->in(
+                    'uid',
+                    $queryBuilder->createNamedParameter($ids, Connection::PARAM_INT_ARRAY)
+                )
             )
             ->execute();
 
@@ -306,7 +343,7 @@ class PlainDataResolver
             }
         }
 
-        return $this->reindex($ids);
+        return $ids;
     }
 
     /**

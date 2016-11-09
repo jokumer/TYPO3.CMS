@@ -16,6 +16,7 @@ namespace TYPO3\CMS\Core\TypoScript;
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Cache\CacheManager;
+use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\AbstractRestrictionContainer;
 use TYPO3\CMS\Core\Database\Query\Restriction\DefaultRestrictionContainer;
@@ -27,7 +28,6 @@ use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
 use TYPO3\CMS\Core\Utility\PathUtility;
-use TYPO3\CMS\Core\Utility\StringUtility;
 use TYPO3\CMS\Frontend\Configuration\TypoScript\ConditionMatching\ConditionMatcher;
 use TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController;
 use TYPO3\CMS\Frontend\Page\PageRepository;
@@ -611,7 +611,12 @@ class TemplateService
                 $queryResult = $queryBuilder
                     ->select('*')
                     ->from('sys_template')
-                    ->where($queryBuilder->expr()->eq('uid', (int)$this->nextLevel))
+                    ->where(
+                        $queryBuilder->expr()->eq(
+                            'uid',
+                            $queryBuilder->createNamedParameter($this->nextLevel, \PDO::PARAM_INT)
+                        )
+                    )
                     ->execute();
                 $this->nextLevel = 0;
                 if ($row = $queryResult->fetch()) {
@@ -624,11 +629,17 @@ class TemplateService
             }
 
             $where = [
-                $queryBuilder->expr()->eq('pid', (int)$this->absoluteRootLine[$a]['uid'])
+                $queryBuilder->expr()->eq(
+                    'pid',
+                    $queryBuilder->createNamedParameter($this->absoluteRootLine[$a]['uid'], \PDO::PARAM_INT)
+                )
             ];
             // If first loop AND there is set an alternative template uid, use that
             if ($a === $c - 1 && $start_template_uid) {
-                $where[] = $queryBuilder->expr()->eq('uid', (int)$start_template_uid);
+                $where[] = $queryBuilder->expr()->eq(
+                    'uid',
+                    $queryBuilder->createNamedParameter($start_template_uid, \PDO::PARAM_INT)
+                );
             }
             $queryBuilder->setRestrictions($this->queryBuilderRestrictions);
             $queryResult = $queryBuilder
@@ -725,7 +736,10 @@ class TemplateService
                     ->select('*')
                     ->from('sys_template')
                     ->where(
-                        $queryBuilder->expr()->in('uid', $basedOnIds)
+                        $queryBuilder->expr()->in(
+                            'uid',
+                            $queryBuilder->createNamedParameter($basedOnIds, Connection::PARAM_INT_ARRAY)
+                        )
                     )
                     ->execute();
                 // make it an associative array with the UID as key
@@ -1197,7 +1211,7 @@ class TemplateService
     protected function mergeConstantsFromIncludedTsConfigFiles($filesToInclude, $TSdataArray)
     {
         foreach ($filesToInclude as $key => $file) {
-            if (!StringUtility::beginsWith($file, 'EXT:')) {
+            if (strpos($file, 'EXT:') !== 0) {
                 continue;
             }
 
@@ -1231,8 +1245,8 @@ class TemplateService
     {
         if (is_array($setupArray)) {
             foreach ($setupArray as $key => $val) {
-                if ($prefix || !StringUtility::beginsWith($key, 'TSConstantEditor')) {
-                    // We don't want 'TSConstantEditor' in the flattend setup on the first level (190201)
+                if ($prefix || strpos($key, 'TSConstantEditor') !== 0) {
+                    // We don't want 'TSConstantEditor' in the flattened setup on the first level (190201)
                     if (is_array($val)) {
                         $this->flattenSetup($val, $prefix . $key);
                     } else {
@@ -1690,9 +1704,18 @@ class TemplateService
                 ->select('uid', 'pid', 'doktype', 'mount_pid', 'mount_pid_ol')
                 ->from('pages')
                 ->where(
-                    $queryBuilder->expr()->eq('pid', (int)$id),
-                    $queryBuilder->expr()->neq('doktype', PageRepository::DOKTYPE_RECYCLER),
-                    $queryBuilder->expr()->neq('doktype', PageRepository::DOKTYPE_BE_USER_SECTION)
+                    $queryBuilder->expr()->eq(
+                        'pid',
+                        $queryBuilder->createNamedParameter($id, \PDO::PARAM_INT)
+                    ),
+                    $queryBuilder->expr()->neq(
+                        'doktype',
+                        $queryBuilder->createNamedParameter(PageRepository::DOKTYPE_RECYCLER, \PDO::PARAM_INT)
+                    ),
+                    $queryBuilder->expr()->neq(
+                        'doktype',
+                        $queryBuilder->createNamedParameter(PageRepository::DOKTYPE_BE_USER_SECTION, \PDO::PARAM_INT)
+                    )
                 )->execute();
             while ($row = $queryResult->fetch()) {
                 // Find mount point if any:

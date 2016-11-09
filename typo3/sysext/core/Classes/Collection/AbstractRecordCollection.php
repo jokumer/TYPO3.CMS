@@ -333,7 +333,7 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface, Pe
         $queryBuilder->getRestrictions()->removeAll()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
         $collectionRecord = $queryBuilder->select('*')
             ->from(static::$storageTableName)
-            ->where($queryBuilder->expr()->eq('uid', (int)$id))
+            ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($id, \PDO::PARAM_INT)))
             ->execute()
             ->fetch();
         return self::create($collectionRecord, $fillItems);
@@ -382,7 +382,7 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface, Pe
 
     /**
      * Returns an array of the persistable properties and contents
-     * which are processable by TCEmain.
+     * which are processable by DataHandler.
      *
      * For internal usage in persist only.
      *
@@ -391,9 +391,9 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface, Pe
     abstract protected function getPersistableDataArray();
 
     /**
-     * Generates comma-separated list of entry uids for usage in TCEmain
+     * Generates comma-separated list of entry uids for usage in DataHandler
      *
-     * also allow to add table name, if it might be needed by TCEmain for
+     * also allow to add table name, if it might be needed by DataHandler for
      * storing the relation
      *
      * @param bool $includeTableName

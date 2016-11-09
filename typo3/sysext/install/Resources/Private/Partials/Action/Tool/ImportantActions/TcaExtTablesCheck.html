@@ -1,0 +1,16 @@
+<h3>TCA in ext_tables.php check</h3>
+<p>
+	Check if an extension changes $GLOBALS['TCA'] in ext_tables.php.
+</p>
+<form method="post">
+	<f:render partial="Action/Common/HiddenFormFields" arguments="{_all}" />
+	<div id="tcaExtTablesCheck">
+		<div class="messageTemplate" style="display: none;">
+			<div class="t3js-message typo3-message alert">
+				<h4></h4>
+				<p class="messageText"></p>
+			</div>
+		</div>
+		<f:render partial="Action/Common/SubmitButton" arguments="{name:'tceExtTablesCheck', text:'Check loaded extensions'}"/>
+	</div>
+</form>

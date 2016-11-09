@@ -33,6 +33,8 @@ Build/typings/*
 .cache
 .sass-cache
 .session
+typo3/sysext/*/Resources/Private/TypeScript/*.js
+typo3/sysext/*/Resources/Public/JavaScript/*.js.map
 typo3/sysext/core/Build/Configuration/Acceptance/Support/_generated/*
 typo3/sysext/core/Build/Configuration/Acceptance/Support/AcceptanceTester.php
 phantomjsdriver.log
@@ -41,7 +43,7 @@ phantomjsdriver.log
 bin/*
 vendor/*
 #
-# Ignore common TYPO3 CMS directories
+# Ignore common TYPO3 CMS files/directories
 typo3temp/*
 typo3conf/*
 fileadmin/*

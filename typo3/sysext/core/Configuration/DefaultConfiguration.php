@@ -274,6 +274,12 @@ return [
         ],
         'fluid' => [
             'interceptors' => [],
+            'namespaces' => [
+                'f' => [
+                    'TYPO3Fluid\\Fluid\\ViewHelpers',
+                    'TYPO3\\CMS\\Fluid\\ViewHelpers'
+                ]
+            ]
         ],
         'linkHandler' => [ // Array: Available link types, class which implement the LinkHandling interface
             'page'   => \TYPO3\CMS\Core\LinkHandling\PageLinkHandler::class,
@@ -463,18 +469,13 @@ return [
                             \TYPO3\CMS\Backend\Form\FormDataProvider\TcaTypesShowitem::class,
                         ],
                     ],
-                    \TYPO3\CMS\Backend\Form\FormDataProvider\TcaFlexFetch::class => [
+                    \TYPO3\CMS\Backend\Form\FormDataProvider\TcaFlexPrepare::class => [
                         'depends' => [
                             \TYPO3\CMS\Backend\Form\FormDataProvider\InitializeProcessedTca::class,
                             \TYPO3\CMS\Backend\Form\FormDataProvider\UserTsConfig::class,
                             \TYPO3\CMS\Backend\Form\FormDataProvider\PageTsConfigMerged::class,
                             \TYPO3\CMS\Backend\Form\FormDataProvider\TcaColumnsRemoveUnused::class,
                             \TYPO3\CMS\Backend\Form\FormDataProvider\TcaColumnsProcessFieldLabels::class,
-                        ],
-                    ],
-                    \TYPO3\CMS\Backend\Form\FormDataProvider\TcaFlexPrepare::class => [
-                        'depends' => [
-                            \TYPO3\CMS\Backend\Form\FormDataProvider\TcaFlexFetch::class,
                         ],
                     ],
                     \TYPO3\CMS\Backend\Form\FormDataProvider\TcaFlexProcess::class => [
@@ -502,8 +503,7 @@ return [
                             \TYPO3\CMS\Backend\Form\FormDataProvider\TcaTypesShowitem::class,
                             \TYPO3\CMS\Backend\Form\FormDataProvider\TcaColumnsRemoveUnused::class,
                             \TYPO3\CMS\Backend\Form\FormDataProvider\TcaCheckboxItems::class,
-                            // GeneralUtility::getFlexFormDS() needs unchanged databaseRow values as string
-                            \TYPO3\CMS\Backend\Form\FormDataProvider\TcaFlexFetch::class,
+                            \TYPO3\CMS\Backend\Form\FormDataProvider\TcaFlexPrepare::class,
                         ],
                     ],
                     \TYPO3\CMS\Backend\Form\FormDataProvider\TcaSelectTreeItems::class => [
@@ -675,16 +675,11 @@ return [
                             \TYPO3\CMS\Backend\Form\FormDataProvider\InlineOverrideChildTca::class,
                         ],
                     ],
-                    \TYPO3\CMS\Backend\Form\FormDataProvider\TcaFlexFetch::class => [
+                    \TYPO3\CMS\Backend\Form\FormDataProvider\TcaFlexPrepare::class => [
                         'depends' => [
                             \TYPO3\CMS\Backend\Form\FormDataProvider\InitializeProcessedTca::class,
                             \TYPO3\CMS\Backend\Form\FormDataProvider\InlineOverrideChildTca::class,
                             \TYPO3\CMS\Backend\Form\FormDataProvider\TcaColumnsRemoveUnused::class,
-                        ],
-                    ],
-                    \TYPO3\CMS\Backend\Form\FormDataProvider\TcaFlexPrepare::class => [
-                        'depends' => [
-                            \TYPO3\CMS\Backend\Form\FormDataProvider\TcaFlexFetch::class,
                         ],
                     ],
                     \TYPO3\CMS\Backend\Form\FormDataProvider\TcaFlexProcess::class => [

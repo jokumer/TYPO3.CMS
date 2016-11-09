@@ -107,8 +107,8 @@ class SplitStorage extends AbstractStorage
             $keyPart2 = substr($key, $splitPoint);
             // Store part of the key in the database
             //
-            // Notice: we may not use TCEmain below to insert key part into the
-            // table because TCEmain requires a valid BE user!
+            // Notice: we may not use DataHandler below to insert key part into the
+            // table because DataHandler requires a valid BE user!
             $time = $GLOBALS['EXEC_TIME'];
             $connection->insert(
                 'tx_rsaauth_keys',
@@ -135,7 +135,12 @@ class SplitStorage extends AbstractStorage
     {
         $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('tx_rsaauth_keys');
         $count = $queryBuilder->delete('tx_rsaauth_keys')
-            ->where($queryBuilder->expr()->lt('crdate', ($GLOBALS['EXEC_TIME'] - 30 * 60)))
+            ->where(
+                $queryBuilder->expr()->lt(
+                    'crdate',
+                    $queryBuilder->createNamedParameter(($GLOBALS['EXEC_TIME'] - 30 * 60), \PDO::PARAM_INT)
+                )
+            )
             ->execute();
 
         return (int)$count;

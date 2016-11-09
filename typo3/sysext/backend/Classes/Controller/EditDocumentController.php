@@ -508,7 +508,7 @@ class EditDocumentController extends AbstractModule
     }
 
     /**
-     * Do processing of data, submitting it to TCEmain.
+     * Do processing of data, submitting it to DataHandler.
      *
      * @return void
      */
@@ -548,7 +548,7 @@ class EditDocumentController extends AbstractModule
         if ($beUser->uc['neverHideAtCopy']) {
             $tce->neverHideAtCopy = 1;
         }
-        // Loading TCEmain with data:
+        // Loading DataHandler with data:
         $tce->start($this->data, $this->cmd);
         if (is_array($this->mirror)) {
             $tce->setMirror($this->mirror);
@@ -572,7 +572,7 @@ class EditDocumentController extends AbstractModule
             );
             debug('Error: Referer host did not match with server host.');
         } else {
-            // Perform the saving operation with TCEmain:
+            // Perform the saving operation with DataHandler:
             $tce->process_uploads($_FILES);
             $tce->process_datamap();
             $tce->process_cmdmap();
@@ -1345,9 +1345,12 @@ class EditDocumentController extends AbstractModule
                     ->where(
                         $queryBuilder->expr()->eq(
                             'tablename',
-                            $queryBuilder->createNamedParameter($this->firstEl['table'])
+                            $queryBuilder->createNamedParameter($this->firstEl['table'], \PDO::PARAM_STR)
                         ),
-                        $queryBuilder->expr()->eq('recuid', (int)$this->firstEl['uid'])
+                        $queryBuilder->expr()->eq(
+                            'recuid',
+                            $queryBuilder->createNamedParameter($this->firstEl['uid'], \PDO::PARAM_INT)
+                        )
                     )
                     ->orderBy('tstamp', 'DESC')
                     ->setMaxResults(1)
@@ -1580,9 +1583,18 @@ class EditDocumentController extends AbstractModule
                         $result = $queryBuilder->select(...GeneralUtility::trimExplode(',', $fetchFields, true))
                             ->from($table)
                             ->where(
-                                $queryBuilder->expr()->eq('pid', (int)$pid),
-                                $queryBuilder->expr()->gt($languageField, 0),
-                                $queryBuilder->expr()->eq($transOrigPointerField, (int)$rowsByLang[0]['uid'])
+                                $queryBuilder->expr()->eq(
+                                    'pid',
+                                    $queryBuilder->createNamedParameter($pid, \PDO::PARAM_INT)
+                                ),
+                                $queryBuilder->expr()->gt(
+                                    $languageField,
+                                    $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT)
+                                ),
+                                $queryBuilder->expr()->eq(
+                                    $transOrigPointerField,
+                                    $queryBuilder->createNamedParameter($rowsByLang[0]['uid'], \PDO::PARAM_INT)
+                                )
                             )
                             ->execute();
 
@@ -1599,28 +1611,36 @@ class EditDocumentController extends AbstractModule
                         if ($this->getBackendUser()->checkLanguageAccess($lang['uid'])) {
                             $newTranslation = isset($rowsByLang[$lang['uid']]) ? '' : ' [' . htmlspecialchars($this->getLanguageService()->sL('LLL:EXT:lang/locallang_core.xlf:labels.new')) . ']';
                             // Create url for creating a localized record
+                            $addOption = true;
                             if ($newTranslation) {
                                 $redirectUrl = BackendUtility::getModuleUrl('record_edit', [
                                     'justLocalized' => $table . ':' . $rowsByLang[0]['uid'] . ':' . $lang['uid'],
                                     'returnUrl' => $this->retUrl
                                 ]);
-                                $href = BackendUtility::getLinkToDataHandlerAction(
-                                    '&cmd[' . $table . '][' . $rowsByLang[0]['uid'] . '][localize]=' . $lang['uid'],
-                                    $redirectUrl
-                                );
+
+                                if ($currentLanguage === 0) {
+                                    $href = BackendUtility::getLinkToDataHandlerAction(
+                                        '&cmd[' . $table . '][' . $rowsByLang[0]['uid'] . '][localize]=' . $lang['uid'],
+                                        $redirectUrl
+                                    );
+                                } else {
+                                    $addOption = false;
+                                }
                             } else {
                                 $href = BackendUtility::getModuleUrl('record_edit', [
                                     'edit[' . $table . '][' . $rowsByLang[$lang['uid']]['uid'] . ']' => 'edit',
                                     'returnUrl' => $this->retUrl
                                 ]);
                             }
-                            $menuItem = $languageMenu->makeMenuItem()
-                                ->setTitle($lang['title'] . $newTranslation)
-                                ->setHref($href);
-                            if ((int)$lang['uid'] === $currentLanguage) {
-                                $menuItem->setActive(true);
+                            if ($addOption) {
+                                $menuItem = $languageMenu->makeMenuItem()
+                                                         ->setTitle($lang['title'] . $newTranslation)
+                                                         ->setHref($href);
+                                if ((int)$lang['uid'] === $currentLanguage) {
+                                    $menuItem->setActive(true);
+                                }
+                                $languageMenu->addMenuItem($menuItem);
                             }
-                            $languageMenu->addMenuItem($menuItem);
                         }
                     }
                     $this->moduleTemplate->getDocHeaderComponent()->getMenuRegistry()->addMenu($languageMenu);
@@ -1652,8 +1672,14 @@ class EditDocumentController extends AbstractModule
             $localizedRecord = $queryBuilder->select('uid')
                 ->from($table)
                 ->where(
-                    $queryBuilder->expr()->eq($GLOBALS['TCA'][$table]['ctrl']['languageField'], (int)$language),
-                    $queryBuilder->expr()->eq($GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField'], (int)$origUid)
+                    $queryBuilder->expr()->eq(
+                        $GLOBALS['TCA'][$table]['ctrl']['languageField'],
+                        $queryBuilder->createNamedParameter($language, \PDO::PARAM_INT)
+                    ),
+                    $queryBuilder->expr()->eq(
+                        $GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField'],
+                        $queryBuilder->createNamedParameter($origUid, \PDO::PARAM_INT)
+                    )
                 )
                 ->execute()
                 ->fetch();
@@ -1721,11 +1747,8 @@ class EditDocumentController extends AbstractModule
             // Add join with pages_languages_overlay table to only show active languages
             $queryBuilder->from('pages_language_overlay', 'o')
                 ->where(
-                    $queryBuilder->expr()->eq(
-                        'o.sys_language_uid',
-                        $queryBuilder->quoteIdentifier('s.uid')
-                    ),
-                    $queryBuilder->expr()->eq('o.pid', (int)$id)
+                    $queryBuilder->expr()->eq('o.sys_language_uid', $queryBuilder->quoteIdentifier('s.uid')),
+                    $queryBuilder->expr()->eq('o.pid', $queryBuilder->createNamedParameter($id, \PDO::PARAM_INT))
                 );
         }
 
@@ -1807,7 +1830,7 @@ class EditDocumentController extends AbstractModule
                     // If the record is already a version of "something" pass it by.
                     if ($reqRecord['pid'] == -1) {
                         // (If it turns out not to be a version of the current workspace there will be trouble, but
-                        // that is handled inside TCEmain then and in the interface it would clearly be an error of
+                        // that is handled inside DataHandler then and in the interface it would clearly be an error of
                         // links if the user accesses such a scenario)
                         return $reqRecord;
                     } else {

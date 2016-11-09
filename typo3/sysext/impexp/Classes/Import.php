@@ -15,6 +15,7 @@ namespace TYPO3\CMS\Impexp;
  */
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
+use TYPO3\CMS\Core\Configuration\FlexForm\FlexFormTools;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Exception;
@@ -53,7 +54,7 @@ class Import extends ImportExport
     /**
      * Keys are [tablename]:[new NEWxxx ids (or when updating it is uids)]
      * while values are arrays with table/uid of the original record it is based on.
-     * With the array keys the new ids can be looked up inside tcemain
+     * With the array keys the new ids can be looked up inside DataHandler
      *
      * @var array
      */
@@ -628,7 +629,7 @@ class Import extends ImportExport
             $this->callHook('after_writeRecordsPages', [
                 'tce' => &$tce
             ]);
-            // post-processing: Registering new ids (end all tcemain sessions with this)
+            // post-processing: Registering new ids (end all DataHandler sessions with this)
             $this->addToMapId($tce->substNEWwithIDs);
             // In case of an update, order pages from the page tree correctly:
             if ($this->update && is_array($this->dat['header']['pagetree'])) {
@@ -753,7 +754,7 @@ class Import extends ImportExport
         $this->callHook('after_writeRecordsRecords', [
             'tce' => &$tce
         ]);
-        // post-processing: Removing files and registering new ids (end all tcemain sessions with this)
+        // post-processing: Removing files and registering new ids (end all DataHandler sessions with this)
         $this->addToMapId($tce->substNEWwithIDs);
         // In case of an update, order pages from the page tree correctly:
         if ($this->update) {
@@ -841,9 +842,21 @@ class Import extends ImportExport
                 $recordInDatabase = $queryBuilder->select('uid')
                     ->from('sys_file_metadata')
                     ->where(
-                        $queryBuilder->expr()->eq('file', (int)$this->import_mapId['sys_file'][$record['file']]),
-                        $queryBuilder->expr()->eq('sys_language_uid', 0),
-                        $queryBuilder->expr()->eq('pid', 0)
+                        $queryBuilder->expr()->eq(
+                            'file',
+                            $queryBuilder->createNamedParameter(
+                                $this->import_mapId['sys_file'][$record['file']],
+                                \PDO::PARAM_INT
+                            )
+                        ),
+                        $queryBuilder->expr()->eq(
+                            'sys_language_uid',
+                            $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT)
+                        ),
+                        $queryBuilder->expr()->eq(
+                            'pid',
+                            $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT)
+                        )
                     )
                     ->execute()
                     ->fetch();
@@ -920,7 +933,7 @@ class Import extends ImportExport
     /**
      * Registers the substNEWids in memory.
      *
-     * @param array $substNEWwithIDs From tcemain to be merged into internal mapping variable in this object
+     * @param array $substNEWwithIDs From DataHandler to be merged into internal mapping variable in this object
      * @return void
      * @see writeRecords()
      */
@@ -1058,7 +1071,7 @@ class Import extends ImportExport
      *
      * @param array $itemArray Array of item sets (table/uid) from a dbAnalysis object
      * @param array $itemConfig Array of TCA config of the field the relation to be set on
-     * @return array Array with values [table]_[uid] or [uid] for field of type group / internal_type file_reference. These values have the regular tcemain-input group/select type which means they will automatically be processed into a uid-list or MM relations.
+     * @return array Array with values [table]_[uid] or [uid] for field of type group / internal_type file_reference. These values have the regular DataHandler-input group/select type which means they will automatically be processed into a uid-list or MM relations.
      */
     public function setRelations_db($itemArray, $itemConfig)
     {
@@ -1174,10 +1187,17 @@ class Import extends ImportExport
                         if (!empty($config['flexFormRels']['db']) || !empty($config['flexFormRels']['file'])) {
                             $origRecordRow = BackendUtility::getRecord($table, $thisNewUid, '*');
                             // This will fetch the new row for the element (which should be updated with any references to data structures etc.)
-                            $conf = $GLOBALS['TCA'][$table]['columns'][$field]['config'];
-                            if (is_array($origRecordRow) && is_array($conf) && $conf['type'] === 'flex') {
+                            $fieldTca = $GLOBALS['TCA'][$table]['columns'][$field];
+                            if (is_array($origRecordRow) && is_array($fieldTca['config']) && $fieldTca['config']['type'] === 'flex') {
                                 // Get current data structure and value array:
-                                $dataStructArray = BackendUtility::getFlexFormDS($conf, $origRecordRow, $table, $field);
+                                $flexFormTools = GeneralUtility::makeInstance(FlexFormTools::class);
+                                $dataStructureIdentifier = $flexFormTools->getDataStructureIdentifier(
+                                    $fieldTca,
+                                    $table,
+                                    $field,
+                                    $origRecordRow
+                                );
+                                $dataStructureArray = $flexFormTools->parseDataStructureByIdentifier($dataStructureIdentifier);
                                 $currentValueArray = GeneralUtility::xml2array($updateData[$table][$thisNewUid][$field]);
                                 // Do recursive processing of the XML data:
                                 $iteratorObj = GeneralUtility::makeInstance(DataHandler::class);
@@ -1186,11 +1206,11 @@ class Import extends ImportExport
                                     $currentValueArray['data'],
                                     [],
                                     [],
-                                    $dataStructArray,
+                                    $dataStructureArray,
                                     [$table, $thisNewUid, $field, $config],
                                     'remapListedDBRecords_flexFormCallBack'
                                 );
-                                // The return value is set as an array which means it will be processed by tcemain for file and DB references!
+                                // The return value is set as an array which means it will be processed by DataHandler for file and DB references!
                                 if (is_array($currentValueArray['data'])) {
                                     $updateData[$table][$thisNewUid][$field] = $currentValueArray;
                                 }
@@ -1282,20 +1302,26 @@ class Import extends ImportExport
                         // Now, if there are any fields that require substitution to be done, lets go for that:
                         foreach ($fieldsIndex as $field => $softRefCfgs) {
                             if (is_array($GLOBALS['TCA'][$table]['columns'][$field])) {
-                                $conf = $GLOBALS['TCA'][$table]['columns'][$field]['config'];
-                                if ($conf['type'] === 'flex') {
+                                if ($GLOBALS['TCA'][$table]['columns'][$field]['config']['type'] === 'flex') {
                                     // This will fetch the new row for the element (which should be updated with any references to data structures etc.)
                                     $origRecordRow = BackendUtility::getRecord($table, $thisNewUid, '*');
                                     if (is_array($origRecordRow)) {
                                         // Get current data structure and value array:
-                                        $dataStructArray = BackendUtility::getFlexFormDS($conf, $origRecordRow, $table, $field);
+                                        $flexFormTools = GeneralUtility::makeInstance(FlexFormTools::class);
+                                        $dataStructureIdentifier = $flexFormTools->getDataStructureIdentifier(
+                                            $GLOBALS['TCA'][$table]['columns'][$field],
+                                            $table,
+                                            $field,
+                                            $origRecordRow
+                                        );
+                                        $dataStructureArray = $flexFormTools->parseDataStructureByIdentifier($dataStructureIdentifier);
                                         $currentValueArray = GeneralUtility::xml2array($origRecordRow[$field]);
                                         // Do recursive processing of the XML data:
                                         /** @var $iteratorObj DataHandler */
                                         $iteratorObj = GeneralUtility::makeInstance(DataHandler::class);
                                         $iteratorObj->callBackObj = $this;
-                                        $currentValueArray['data'] = $iteratorObj->checkValue_flex_procInData($currentValueArray['data'], [], [], $dataStructArray, [$table, $uid, $field, $softRefCfgs], 'processSoftReferences_flexFormCallBack');
-                                        // The return value is set as an array which means it will be processed by tcemain for file and DB references!
+                                        $currentValueArray['data'] = $iteratorObj->checkValue_flex_procInData($currentValueArray['data'], [], [], $dataStructureArray, [$table, $uid, $field, $softRefCfgs], 'processSoftReferences_flexFormCallBack');
+                                        // The return value is set as an array which means it will be processed by DataHandler for file and DB references!
                                         if (is_array($currentValueArray['data'])) {
                                             $inData[$table][$thisNewUid][$field] = $currentValueArray;
                                         }

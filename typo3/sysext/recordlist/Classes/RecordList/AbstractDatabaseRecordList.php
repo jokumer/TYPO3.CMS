@@ -911,12 +911,12 @@ class AbstractDatabaseRecordList extends AbstractRecordList
         $tablePidField = $table === 'pages' ? 'uid' : 'pid';
         // Make query, only if table is valid and a search string is actually defined:
         if (empty($this->searchString)) {
-            return '1=1';
+            return '';
         }
 
         $searchableFields = $this->getSearchFields($table);
         if (empty($searchableFields)) {
-            return '1=1';
+            return '';
         }
         if (MathUtility::canBeInterpretedAsInteger($this->searchString)) {
             $constraints[] = $expressionBuilder->eq('uid', (int)$this->searchString);
@@ -1309,8 +1309,14 @@ class AbstractDatabaseRecordList extends AbstractRecordList
             $localizedRecordUid = $queryBuilder->select('uid')
                 ->from($table)
                 ->where(
-                    $queryBuilder->expr()->eq($GLOBALS['TCA'][$table]['ctrl']['languageField'], (int)$language),
-                    $queryBuilder->expr()->eq($GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField'], (int)$orig_uid)
+                    $queryBuilder->expr()->eq(
+                        $GLOBALS['TCA'][$table]['ctrl']['languageField'],
+                        $queryBuilder->createNamedParameter($language, \PDO::PARAM_INT)
+                    ),
+                    $queryBuilder->expr()->eq(
+                        $GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField'],
+                        $queryBuilder->createNamedParameter($orig_uid, \PDO::PARAM_INT)
+                    )
                 )
                 ->setMaxResults(1)
                 ->execute()

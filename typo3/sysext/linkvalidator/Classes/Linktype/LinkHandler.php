@@ -17,7 +17,6 @@ namespace TYPO3\CMS\Linkvalidator\Linktype;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Core\Utility\StringUtility;
 
 /**
  * This class provides Check Link Handler plugin implementation
@@ -109,7 +108,7 @@ class LinkHandler extends AbstractLinktype
      */
     public function fetchType($value, $type, $key)
     {
-        if ($value['type'] === 'string' && StringUtility::beginsWith(strtolower($value['tokenValue']), 'record:')) {
+        if ($value['type'] === 'string' && strpos(strtolower($value['tokenValue']), 'record:') === 0) {
             $type = 'linkhandler';
         }
         return $type;
@@ -195,7 +194,12 @@ class LinkHandler extends AbstractLinktype
         $row = $queryBuilder
             ->select('*')
             ->from($tableName)
-            ->where($queryBuilder->expr()->eq('uid', (int)$uid))
+            ->where(
+                $queryBuilder->expr()->eq(
+                    'uid',
+                    $queryBuilder->createNamedParameter($uid, \PDO::PARAM_INT)
+                )
+            )
             ->execute()
             ->fetch();
 

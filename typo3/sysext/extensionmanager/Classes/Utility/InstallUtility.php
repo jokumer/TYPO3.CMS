@@ -180,7 +180,7 @@ class InstallUtility implements \TYPO3\CMS\Core\SingletonInterface
      */
     public function install($extensionKey)
     {
-        $extension = $this->enrichExtensionWithDetails($extensionKey);
+        $extension = $this->enrichExtensionWithDetails($extensionKey, false);
         $this->ensureConfiguredDirectoriesExist($extension);
         $this->loadExtension($extensionKey);
         if (!empty($extension['clearcacheonload']) || !empty($extension['clearCacheOnLoad'])) {
@@ -325,14 +325,19 @@ class InstallUtility implements \TYPO3\CMS\Core\SingletonInterface
      * Fetch additional information for an extension key
      *
      * @param string $extensionKey
+     * @param bool $loadTerInformation
      * @access private
      * @return array
      * @throws ExtensionManagerException
      */
-    public function enrichExtensionWithDetails($extensionKey)
+    public function enrichExtensionWithDetails($extensionKey, $loadTerInformation = true)
     {
         $extension = $this->getExtensionArray($extensionKey);
-        $availableAndInstalledExtensions = $this->listUtility->enrichExtensionsWithEmConfAndTerInformation([$extensionKey => $extension]);
+        if (!$loadTerInformation) {
+            $availableAndInstalledExtensions = $this->listUtility->enrichExtensionsWithEmConfInformation([$extensionKey => $extension]);
+        } else {
+            $availableAndInstalledExtensions = $this->listUtility->enrichExtensionsWithEmConfAndTerInformation([$extensionKey => $extension]);
+        }
 
         if (!isset($availableAndInstalledExtensions[$extensionKey])) {
             throw new ExtensionManagerException(
@@ -383,7 +388,14 @@ class InstallUtility implements \TYPO3\CMS\Core\SingletonInterface
             $extTablesSqlContent .= file_get_contents($extTablesSqlFile);
         }
         if ($extTablesSqlContent !== '') {
-            $this->updateDbWithExtTablesSql($extTablesSqlContent);
+            try {
+                $this->updateDbWithExtTablesSql($extTablesSqlContent);
+            } catch (\TYPO3\CMS\Core\Database\Schema\Exception\StatementException $e) {
+                throw new ExtensionManagerException(
+                    $e->getMessage(),
+                    1476340371
+                );
+            }
         }
 
         $this->importStaticSqlFile($extension['siteRelPath']);

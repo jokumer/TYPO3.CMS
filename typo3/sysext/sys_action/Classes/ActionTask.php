@@ -16,6 +16,7 @@ namespace TYPO3\CMS\SysAction;
 
 use Doctrine\DBAL\DBALException;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
+use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Database\Query\Restriction\HiddenRestriction;
@@ -206,7 +207,15 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
                         $queryBuilder->quoteIdentifier('be_groups.uid')
                     )
                 )
-                ->where($queryBuilder->expr()->in('be_groups.uid', GeneralUtility::intExplode(',', $groupList, true)))
+                ->where(
+                    $queryBuilder->expr()->in(
+                        'be_groups.uid',
+                        $queryBuilder->createNamedParameter(
+                            GeneralUtility::intExplode(',', $groupList, true),
+                            Connection::PARAM_INT_ARRAY
+                        )
+                    )
+                )
                 ->groupBy('sys_action.uid');
         }
 
@@ -470,8 +479,14 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
             ->select('*')
             ->from('be_users')
             ->where(
-                $queryBuilder->expr()->eq('cruser_id', (int)$this->getBackendUser()->user['uid']),
-                $queryBuilder->expr()->eq('createdByAction', (int)$action['uid'])
+                $queryBuilder->expr()->eq(
+                    'cruser_id',
+                    $queryBuilder->createNamedParameter($this->getBackendUser()->user['uid'], \PDO::PARAM_INT)
+                ),
+                $queryBuilder->expr()->eq(
+                    'createdByAction',
+                    $queryBuilder->createNamedParameter($action['uid'], \PDO::PARAM_INT)
+                )
             )
             ->orderBy('username')
             ->execute();
@@ -578,13 +593,13 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
                 $newUserId = $key;
             }
         }
-        // Save/update user by using TCEmain
+        // Save/update user by using DataHandler
         if (is_array($data)) {
-            $tce = GeneralUtility::makeInstance(\TYPO3\CMS\Core\DataHandling\DataHandler::class);
-            $tce->start($data, [], $this->getBackendUser());
-            $tce->admin = 1;
-            $tce->process_datamap();
-            $newUserId = (int)$tce->substNEWwithIDs['NEW'];
+            $dataHandler = GeneralUtility::makeInstance(\TYPO3\CMS\Core\DataHandling\DataHandler::class);
+            $dataHandler->start($data, [], $this->getBackendUser());
+            $dataHandler->admin = 1;
+            $dataHandler->process_datamap();
+            $newUserId = (int)$dataHandler->substNEWwithIDs['NEW'];
             if ($newUserId) {
                 // Create
                 $this->action_createDir($newUserId);
@@ -952,8 +967,8 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
 					top.fsMod.recentIds["web"]=id;
 					top.fsMod.navFrameHighlightedID["web"]="pages"+id+"_"+top.fsMod.currentBank;	// For highlighting
 
-					if (top.content && top.content.nav_frame && top.content.nav_frame.refresh_nav) {
-						top.content.nav_frame.refresh_nav();
+					if (top.nav_frame && top.nav_frame.refresh_nav) {
+						top.nav_frame.refresh_nav();
 					}
 				}
 

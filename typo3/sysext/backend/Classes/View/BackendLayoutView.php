@@ -154,7 +154,12 @@ class BackendLayoutView implements \TYPO3\CMS\Core\SingletonInterface
                 $pageId = $queryBuilder
                     ->select('pid')
                     ->from($tableName)
-                    ->where($queryBuilder->expr()->eq('uid', abs($data['pid'])))
+                    ->where(
+                        $queryBuilder->expr()->eq(
+                            'uid',
+                            $queryBuilder->createNamedParameter(abs($data['pid']), \PDO::PARAM_INT)
+                        )
+                    )
                     ->execute()
                     ->fetchColumn();
             } else {
@@ -364,6 +369,9 @@ class BackendLayoutView implements \TYPO3\CMS\Core\SingletonInterface
                 foreach ($backendLayoutData['__config']['backend_layout.']['rows.'] as $row) {
                     if (!empty($row['columns.'])) {
                         foreach ($row['columns.'] as $column) {
+                            if (!isset($column['colPos'])) {
+                                continue;
+                            }
                             $backendLayoutData['__items'][] = [
                                 $this->getColumnName($column),
                                 $column['colPos'],
@@ -434,7 +442,12 @@ class BackendLayoutView implements \TYPO3\CMS\Core\SingletonInterface
         $page = $queryBuilder
             ->select('uid', 'pid', 'backend_layout')
             ->from('pages')
-            ->where($queryBuilder->expr()->eq('uid', (int)$pageId))
+            ->where(
+                $queryBuilder->expr()->eq(
+                    'uid',
+                    $queryBuilder->createNamedParameter($pageId, \PDO::PARAM_INT)
+                )
+            )
             ->execute()
             ->fetch();
         BackendUtility::workspaceOL('pages', $page);

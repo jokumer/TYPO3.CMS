@@ -40,7 +40,6 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\HttpUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
 use TYPO3\CMS\Core\Utility\PathUtility;
-use TYPO3\CMS\Core\Utility\StringUtility;
 use TYPO3\CMS\Core\Versioning\VersionState;
 use TYPO3\CMS\Frontend\Page\PageRepository;
 use TYPO3\CMS\Lang\LanguageService;
@@ -130,7 +129,7 @@ class BackendUtility
             $queryBuilder
                 ->select(...GeneralUtility::trimExplode(',', $fields, true))
                 ->from($table)
-                ->where($queryBuilder->expr()->eq('uid', (int)$uid));
+                ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($uid, \PDO::PARAM_INT)));
 
             // add custom where clause
             if ($where) {
@@ -390,12 +389,15 @@ class BackendUtility
         if (self::isTableLocalizable($table)) {
             $tcaCtrl = $GLOBALS['TCA'][$table]['ctrl'];
 
-            $expressionBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-                ->getQueryBuilderForTable($table)
-                ->expr();
+            $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
+                ->getQueryBuilderForTable($table);
+            $expressionBuilder = $queryBuilder->expr();
 
             $constraint = $expressionBuilder->andX(
-                $expressionBuilder->eq($tcaCtrl['languageField'], (int)$language),
+                $expressionBuilder->eq(
+                    $tcaCtrl['languageField'],
+                    $queryBuilder->createNamedParameter($language, \PDO::PARAM_INT)
+                ),
                 QueryHelper::stripLogicalOperatorPrefix($andWhereClause)
             );
 
@@ -519,7 +521,7 @@ class BackendUtility
                 )
                 ->from('pages')
                 ->where(
-                    $queryBuilder->expr()->eq('uid', (int)$uid),
+                    $queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($uid, \PDO::PARAM_INT)),
                     QueryHelper::stripLogicalOperatorPrefix($clause)
                 )
                 ->execute()
@@ -749,6 +751,25 @@ class BackendUtility
                 }
             }
 
+            // Add palette fields e.g. for a valid RTE transformation
+            $paletteFieldList = [];
+            foreach ($fieldList as $fieldData) {
+                list($pFieldName, $pAltTitle, $pPalette) = GeneralUtility::trimExplode(';', $fieldData);
+                if ($pPalette
+                    && isset($GLOBALS['TCA'][$table]['palettes'][$pPalette])
+                    && is_array($GLOBALS['TCA'][$table]['palettes'][$pPalette])
+                    && isset($GLOBALS['TCA'][$table]['palettes'][$pPalette]['showitem'])
+                ) {
+                    $paletteFields = GeneralUtility::trimExplode(',', $GLOBALS['TCA'][$table]['palettes'][$pPalette]['showitem'], true);
+                    foreach ($paletteFields as $paletteField) {
+                        if ($paletteField !== '--linebreak--') {
+                            $paletteFieldList[] = $paletteField;
+                        }
+                    }
+                }
+            }
+            $fieldList = array_merge($fieldList, $paletteFieldList);
+
             $altFieldList = [];
             // Traverse fields in types config and parse the configuration into a nice array:
             foreach ($fieldList as $k => $v) {
@@ -930,12 +951,13 @@ class BackendUtility
      * @param string $table The table name
      * @param string $fieldName Optional fieldname passed to hook object
      * @param bool $WSOL If set, workspace overlay is applied to records. This is correct behaviour for all presentation and export, but NOT if you want a TRUE reflection of how things are in the live workspace.
-     * @param int $newRecordPidValue SPECIAL CASES: Use this, if the DataStructure may come from a parent record and the INPUT row doesn't have a uid yet (hence, the pid cannot be looked up). Then it is necessary to supply a PID value to search recursively in for the DS (used from TCEmain)
+     * @param int $newRecordPidValue SPECIAL CASES: Use this, if the DataStructure may come from a parent record and the INPUT row doesn't have a uid yet (hence, the pid cannot be looked up). Then it is necessary to supply a PID value to search recursively in for the DS (used from DataHandler)
      * @return mixed If array, the data structure was found and returned as an array. Otherwise (string) it is an error message.
-     * @todo: All those nasty details should be covered with tests, also it is very unfortunate the final $srcPointer is not exposed
+     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9. This is now integrated as FlexFormTools->getDataStructureIdentifier()
      */
     public static function getFlexFormDS($conf, $row, $table, $fieldName = '', $WSOL = true, $newRecordPidValue = 0)
     {
+        GeneralUtility::logDeprecatedFunction();
         // Get pointer field etc from TCA-config:
         $ds_pointerField = $conf['ds_pointerField'];
         $ds_array = $conf['ds'];
@@ -1011,7 +1033,13 @@ class BackendUtility
                         ->select('uid', $ds_pointerField, $ds_searchParentField)
                         ->from($table)
                         ->where(
-                            $queryBuilder->expr()->eq('uid', (int)($newRecordPidValue ?: $rr[$ds_searchParentField]))
+                            $queryBuilder->expr()->eq(
+                                'uid',
+                                $queryBuilder->createNamedParameter(
+                                    ($newRecordPidValue ?: $rr[$ds_searchParentField]),
+                                    \PDO::PARAM_INT
+                                )
+                            )
                         );
                     if ($subFieldPointer) {
                         $queryBuilder->addSelect($subFieldPointer);
@@ -1074,6 +1102,8 @@ class BackendUtility
             $dataStructArray = 'No proper configuration!';
         }
         // Hook for post-processing the Flexform DS. Introduces the possibility to configure Flexforms via TSConfig
+        // This hook isn't called anymore from within the core, the whole method is deprecated.
+        // There are alternative hooks, see FlexFormTools->getDataStructureIdentifier() and ->parseDataStructureByIdentifier()
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_befunc.php']['getFlexFormDSClass'])) {
             foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_befunc.php']['getFlexFormDSClass'] as $classRef) {
                 $hookObj = GeneralUtility::getUserObj($classRef);
@@ -1173,7 +1203,7 @@ class BackendUtility
                     $includeTsConfigFileList = GeneralUtility::trimExplode(',', $v['tsconfig_includes'], true);
                     // Traversing list
                     foreach ($includeTsConfigFileList as $key => $includeTsConfigFile) {
-                        if (StringUtility::beginsWith($includeTsConfigFile, 'EXT:')) {
+                        if (strpos($includeTsConfigFile, 'EXT:') === 0) {
                             list($includeTsConfigFileExtensionKey, $includeTsConfigFilename) = explode(
                                 '/',
                                 substr($includeTsConfigFile, 4),
@@ -2277,7 +2307,12 @@ class BackendUtility
                             $result = $queryBuilder
                                 ->select('uid', $MMfield)
                                 ->from($theColConf['foreign_table'])
-                                ->where($queryBuilder->expr()->in('uid', $selectUids))
+                                ->where(
+                                    $queryBuilder->expr()->in(
+                                        'uid',
+                                        $queryBuilder->createNamedParameter($selectUids, Connection::PARAM_INT_ARRAY)
+                                    )
+                                )
                                 ->execute();
 
                             $mmlA = [];
@@ -2327,13 +2362,16 @@ class BackendUtility
                                     ->removeAll()
                                     ->add(GeneralUtility::makeInstance(BackendWorkspaceRestriction::class));
                                 $constraints = [
-                                    $queryBuilder->expr()->eq($theColConf['foreign_field'], (int)$uid)
+                                    $queryBuilder->expr()->eq(
+                                        $theColConf['foreign_field'],
+                                        $queryBuilder->createNamedParameter($uid, \PDO::PARAM_INT)
+                                    )
                                 ];
 
                                 if (!empty($theColConf['foreign_table_field'])) {
                                     $constraints[] = $queryBuilder->expr()->eq(
                                         $theColConf['foreign_table_field'],
-                                        $queryBuilder->createNamedParameter($table)
+                                        $queryBuilder->createNamedParameter($table, \PDO::PARAM_STR)
                                     );
                                 }
 
@@ -2425,7 +2463,15 @@ class BackendUtility
                                 $result = $queryBuilder
                                     ->select('uid', $MMfield)
                                     ->from($theColConf['foreign_table'])
-                                    ->where($queryBuilder->expr()->in('uid', $selectUids))
+                                    ->where(
+                                        $queryBuilder->expr()->in(
+                                            'uid',
+                                            $queryBuilder->createNamedParameter(
+                                                $selectUids,
+                                                Connection::PARAM_INT_ARRAY
+                                            )
+                                        )
+                                    )
                                     ->execute();
 
                                 $mmlA = [];
@@ -3477,8 +3523,8 @@ class BackendUtility
                         break;
                     case 'updateFolderTree':
                         $signals[] = '
-								if (top && top.TYPO3.Backend && top.TYPO3.Backend.NavigationIframe) {
-									top.TYPO3.Backend.NavigationIframe.refresh();
+								if (top && top.nav_frame && top.nav_frame.location) {
+									top.nav_frame.location.reload(true);
 								}';
                         break;
                     case 'updateModuleMenu':
@@ -3708,12 +3754,18 @@ class BackendUtility
                 ->from('sys_lockedrecords')
                 ->where(
                     $queryBuilder->expr()->neq(
-                        'sys_lockedrecords' . '.userid',
-                        (int)static::getBackendUserAuthentication()->user['uid']
+                        'sys_lockedrecords.userid',
+                        $queryBuilder->createNamedParameter(
+                            static::getBackendUserAuthentication()->user['uid'],
+                            \PDO::PARAM_INT
+                        )
                     ),
                     $queryBuilder->expr()->gt(
-                        'sys_lockedrecords' . '.tstamp',
-                        ($GLOBALS['EXEC_TIME'] - 2 * 3600)
+                        'sys_lockedrecords.tstamp',
+                        $queryBuilder->createNamedParameter(
+                            ($GLOBALS['EXEC_TIME'] - 2 * 3600),
+                            \PDO::PARAM_INT
+                        )
                     )
                 )
                 ->execute();
@@ -3966,11 +4018,11 @@ class BackendUtility
                 $queryBuilder->expr()->orX(
                     $queryBuilder->expr()->eq(
                         'sys_domain.domainName',
-                        $queryBuilder->createNamedParameter($domain)
+                        $queryBuilder->createNamedParameter($domain, \PDO::PARAM_STR)
                     ),
                     $queryBuilder->expr()->eq(
                         'sys_domain.domainName',
-                        $queryBuilder->createNamedParameter($domain . '/')
+                        $queryBuilder->createNamedParameter($domain . '/', \PDO::PARAM_STR)
                     )
                 )
 
@@ -4123,8 +4175,8 @@ class BackendUtility
                 ->count('*')
                 ->from('sys_refindex')
                 ->where(
-                    $queryBuilder->expr()->eq('ref_table', $queryBuilder->quote($table)),
-                    $queryBuilder->expr()->eq('deleted', 0)
+                    $queryBuilder->expr()->eq('ref_table', $queryBuilder->createNamedParameter($table, \PDO::PARAM_STR)),
+                    $queryBuilder->expr()->eq('deleted', $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT))
                 );
 
             // Look up the path:
@@ -4135,10 +4187,15 @@ class BackendUtility
 
                 $ref = PathUtility::stripPathSitePrefix($ref);
                 $queryBuilder->andWhere(
-                    $queryBuilder->expr()->eq('ref_string', $queryBuilder->createNamedParameter($ref))
+                    $queryBuilder->expr()->eq('ref_string', $queryBuilder->createNamedParameter($ref, \PDO::PARAM_STR))
                 );
             } else {
-                $queryBuilder->andWhere($queryBuilder->expr()->eq('ref_uid', (int)$ref));
+                $queryBuilder->andWhere(
+                    $queryBuilder->expr()->eq('ref_uid', $queryBuilder->createNamedParameter($ref, \PDO::PARAM_INT))
+                );
+                if ($table === 'sys_file') {
+                    $queryBuilder->andWhere($queryBuilder->expr()->neq('tablename', $queryBuilder->quote('sys_file_metadata')));
+                }
             }
 
             $count = $queryBuilder->execute()->fetchColumn(0);
@@ -4176,8 +4233,14 @@ class BackendUtility
                 ->count('*')
                 ->from($table)
                 ->where(
-                    $queryBuilder->expr()->eq($GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField'], (int)$ref),
-                    $queryBuilder->expr()->neq($GLOBALS['TCA'][$table]['ctrl']['languageField'], 0)
+                    $queryBuilder->expr()->eq(
+                        $GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField'],
+                        $queryBuilder->createNamedParameter($ref, \PDO::PARAM_INT)
+                    ),
+                    $queryBuilder->expr()->neq(
+                        $GLOBALS['TCA'][$table]['ctrl']['languageField'],
+                        $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT)
+                    )
                 )
                 ->execute()
                 ->fetchColumn(0);
@@ -4245,9 +4308,9 @@ class BackendUtility
             $queryBuilder
                 ->from($table)
                 ->where(
-                    $queryBuilder->expr()->eq('pid', -1),
-                    $queryBuilder->expr()->neq('uid', (int)$uid),
-                    $queryBuilder->expr()->eq('t3ver_oid', (int)$uid)
+                    $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)),
+                    $queryBuilder->expr()->neq('uid', $queryBuilder->createNamedParameter($uid, \PDO::PARAM_INT)),
+                    $queryBuilder->expr()->eq('t3ver_oid', $queryBuilder->createNamedParameter($uid, \PDO::PARAM_INT))
                 )
                 ->orderBy('t3ver_id', 'DESC');
 
@@ -4257,10 +4320,20 @@ class BackendUtility
 
             if ($workspace === 0) {
                 // Only in Live WS
-                $queryBuilder->andWhere($queryBuilder->expr()->eq('t3ver_wsid', 0));
+                $queryBuilder->andWhere(
+                    $queryBuilder->expr()->eq(
+                        't3ver_wsid',
+                        $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT)
+                    )
+                );
             } elseif ($workspace !== null) {
                 // In Live WS and Workspace with given ID
-                $queryBuilder->andWhere($queryBuilder->expr()->in('t3ver_wsid', [0, (int)$workspace]));
+                $queryBuilder->andWhere(
+                    $queryBuilder->expr()->in(
+                        't3ver_wsid',
+                        $queryBuilder->createNamedParameter([0, (int)$workspace], Connection::PARAM_INT_ARRAY)
+                    )
+                );
             }
 
             $rows = $queryBuilder->execute()->fetchAll();
@@ -4485,9 +4558,18 @@ class BackendUtility
                 $row = $queryBuilder
                     ->from($table)
                     ->where(
-                        $queryBuilder->expr()->eq('pid', -1),
-                        $queryBuilder->expr()->eq('t3ver_oid', (int)$uid),
-                        $queryBuilder->expr()->eq('t3ver_wsid', (int)$workspace)
+                        $queryBuilder->expr()->eq(
+                            'pid',
+                            $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)
+                        ),
+                        $queryBuilder->expr()->eq(
+                            't3ver_oid',
+                            $queryBuilder->createNamedParameter($uid, \PDO::PARAM_INT)
+                        ),
+                        $queryBuilder->expr()->eq(
+                            't3ver_wsid',
+                            $queryBuilder->createNamedParameter($workspace, \PDO::PARAM_INT)
+                        )
                     )
                     ->execute()
                     ->fetch();
@@ -4614,10 +4696,25 @@ class BackendUtility
                 ->select(...GeneralUtility::trimExplode(',', $fields, true))
                 ->from($table)
                 ->where(
-                    $queryBuilder->expr()->neq('pid', -1),
-                    $queryBuilder->expr()->eq('t3ver_state', (string)(new VersionState(VersionState::MOVE_PLACEHOLDER))),
-                    $queryBuilder->expr()->eq('t3ver_move_id', (int)$uid),
-                    $queryBuilder->expr()->eq('t3ver_wsid', (int)$workspace)
+                    $queryBuilder->expr()->neq(
+                        'pid',
+                        $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)
+                    ),
+                    $queryBuilder->expr()->eq(
+                        't3ver_state',
+                        $queryBuilder->createNamedParameter(
+                            (string)new VersionState(VersionState::MOVE_PLACEHOLDER),
+                            \PDO::PARAM_INT
+                        )
+                    ),
+                    $queryBuilder->expr()->eq(
+                        't3ver_move_id',
+                        $queryBuilder->createNamedParameter($uid, \PDO::PARAM_INT)
+                    ),
+                    $queryBuilder->expr()->eq(
+                        't3ver_wsid',
+                        $queryBuilder->createNamedParameter($workspace, \PDO::PARAM_INT)
+                    )
                 )
                 ->execute()
                 ->fetch();
@@ -4832,8 +4929,14 @@ class BackendUtility
             ->count('uid')
             ->from('sys_be_shortcuts')
             ->where(
-                $queryBuilder->expr()->eq('userid', (int)self::getBackendUserAuthentication()->user['uid']),
-                $queryBuilder->expr()->eq('url', $queryBuilder->createNamedParameter($url))
+                $queryBuilder->expr()->eq(
+                    'userid',
+                    $queryBuilder->createNamedParameter(
+                        self::getBackendUserAuthentication()->user['uid'],
+                        \PDO::PARAM_INT
+                    )
+                ),
+                $queryBuilder->expr()->eq('url', $queryBuilder->createNamedParameter($url, \PDO::PARAM_STR))
             )
             ->execute()
             ->fetchColumn(0);

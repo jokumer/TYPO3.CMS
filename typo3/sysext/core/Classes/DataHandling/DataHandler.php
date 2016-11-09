@@ -23,6 +23,7 @@ use TYPO3\CMS\Core\Cache\CacheManager;
 use TYPO3\CMS\Core\Cache\Frontend\VariableFrontend;
 use TYPO3\CMS\Core\Charset\CharsetConverter;
 use TYPO3\CMS\Core\Configuration\FlexForm\FlexFormTools;
+use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\QueryBuilder;
 use TYPO3\CMS\Core\Database\Query\QueryHelper;
@@ -1157,7 +1158,6 @@ class DataHandler
                                 $cmd = [];
                                 $cmd[$table][$id]['version'] = [
                                     'action' => 'new',
-                                    'treeLevels' => -1,
                                     // Default is to create a version of the individual records... element versioning that is.
                                     'label' => 'Auto-created for WS #' . $this->BE_USER->workspace
                                 ];
@@ -2346,19 +2346,29 @@ class DataHandler
     {
         if (is_array($value)) {
             // This value is necessary for flex form processing to happen on flexform fields in page records when they are copied.
-            // Problem: when copying a page, flexform XML comes along in the array for the new record - but since $this->checkValue_currentRecord does not have a uid or pid for that
-            // sake, the BackendUtility::getFlexFormDS() function returns no good DS. For new records we do know the expected PID so therefore we send that with this special parameter.
-            // Only active when larger than zero.
-            $newRecordPidValue = $status == 'new' ? $realPid : 0;
+            // Problem: when copying a page, flexform XML comes along in the array for the new record - but since $this->checkValue_currentRecord
+            // does not have a uid or pid for that sake, the FlexFormTools->getDataStructureIdentifier() function returns no good DS. For new
+            // records we do know the expected PID so therefore we send that with this special parameter. Only active when larger than zero.
+            $row = $this->checkValue_currentRecord;
+            if ($status === 'new') {
+                $row['pid'] = $realPid;
+            }
             // Get current value array:
-            $dataStructArray = BackendUtility::getFlexFormDS($tcaFieldConf, $this->checkValue_currentRecord, $table, $field, true, $newRecordPidValue);
+            $flexFormTools = GeneralUtility::makeInstance(FlexFormTools::class);
+            $dataStructureIdentifier = $flexFormTools->getDataStructureIdentifier(
+                [ 'config' => $tcaFieldConf ],
+                $table,
+                $field,
+                $row
+            );
+            $dataStructureArray = $flexFormTools->parseDataStructureByIdentifier($dataStructureIdentifier);
             $currentValueArray = (string)$curValue !== '' ? GeneralUtility::xml2array($curValue) : [];
             if (!is_array($currentValueArray)) {
                 $currentValueArray = [];
             }
             // Remove all old meta for languages...
             // Evaluation of input values:
-            $value['data'] = $this->checkValue_flex_procInData($value['data'], $currentValueArray['data'], $uploadedFiles['data'], $dataStructArray, [$table, $id, $curValue, $status, $realPid, $recFID, $tscPID]);
+            $value['data'] = $this->checkValue_flex_procInData($value['data'], $currentValueArray['data'], $uploadedFiles['data'], $dataStructureArray, [$table, $id, $curValue, $status, $realPid, $recFID, $tscPID]);
             // Create XML from input value:
             $xmlValue = $this->checkValue_flexArray2Xml($value, true);
 
@@ -2602,17 +2612,17 @@ class DataHandler
             ->count('uid')
             ->from($table)
             ->where(
-                $queryBuilder->expr()->eq($field, $queryBuilder->createPositionalParameter($value)),
-                $queryBuilder->expr()->neq('uid', $uid)
+                $queryBuilder->expr()->eq($field, $queryBuilder->createPositionalParameter($value, \PDO::PARAM_STR)),
+                $queryBuilder->expr()->neq('uid', $queryBuilder->createPositionalParameter($uid, \PDO::PARAM_INT))
             );
         if ($pid !== 0) {
             $queryBuilder->andWhere(
-                $queryBuilder->expr()->eq('pid', $pid)
+                $queryBuilder->expr()->eq('pid', $queryBuilder->createPositionalParameter($pid, \PDO::PARAM_INT))
             );
         } else {
             // pid>=0 for versioning
             $queryBuilder->andWhere(
-                $queryBuilder->expr()->gte('pid', 0)
+                $queryBuilder->expr()->gte('pid', $queryBuilder->createPositionalParameter(0, \PDO::PARAM_INT))
             );
         }
 
@@ -2857,6 +2867,9 @@ class DataHandler
         $dbAnalysis->registerNonTableValues = !empty($tcaFieldConf['allowNonIdValues']);
         $dbAnalysis->start($newRelations, $tables, '', 0, $currentTable, $tcaFieldConf);
         if ($tcaFieldConf['MM']) {
+            // convert submitted items to use version ids instead of live ids
+            // (only required for MM relations in a workspace context)
+            $dbAnalysis->convertItemArray();
             if ($status == 'update') {
                 /** @var $oldRelations_dbAnalysis RelationHandler */
                 $oldRelations_dbAnalysis = $this->createRelationHandlerInstance();
@@ -2908,21 +2921,28 @@ class DataHandler
      * @param array $dataPart The 'data' part of the INPUT flexform data
      * @param array $dataPart_current The 'data' part of the CURRENT flexform data
      * @param array $uploadedFiles The uploaded files for the 'data' part of the INPUT flexform data
-     * @param array $dataStructArray Data structure for the form (might be sheets or not). Only values in the data array which has a configuration in the data structure will be processed.
+     * @param array $dataStructure Data structure for the form (might be sheets or not). Only values in the data array which has a configuration in the data structure will be processed.
      * @param array $pParams A set of parameters to pass through for the calling of the evaluation functions
      * @param string $callBackFunc Optional call back function, see checkValue_flex_procInData_travDS()  DEPRECATED, use \TYPO3\CMS\Core\Configuration\FlexForm\FlexFormTools instead for traversal!
      * @param array $workspaceOptions
      * @return array The modified 'data' part.
      * @see checkValue_flex_procInData_travDS()
      */
-    public function checkValue_flex_procInData($dataPart, $dataPart_current, $uploadedFiles, $dataStructArray, $pParams, $callBackFunc = '', array $workspaceOptions = [])
+    public function checkValue_flex_procInData($dataPart, $dataPart_current, $uploadedFiles, $dataStructure, $pParams, $callBackFunc = '', array $workspaceOptions = [])
     {
         if (is_array($dataPart)) {
             foreach ($dataPart as $sKey => $sheetDef) {
-                list($dataStruct, $actualSheet) = GeneralUtility::resolveSheetDefInDS($dataStructArray, $sKey);
-                if (is_array($dataStruct) && $actualSheet == $sKey && is_array($sheetDef)) {
+                if (isset($dataStructure['sheets'][$sKey]) && is_array($dataStructure['sheets'][$sKey]) && is_array($sheetDef)) {
                     foreach ($sheetDef as $lKey => $lData) {
-                        $this->checkValue_flex_procInData_travDS($dataPart[$sKey][$lKey], $dataPart_current[$sKey][$lKey], $uploadedFiles[$sKey][$lKey], $dataStruct['ROOT']['el'], $pParams, $callBackFunc, $sKey . '/' . $lKey . '/', $workspaceOptions);
+                        $this->checkValue_flex_procInData_travDS(
+                            $dataPart[$sKey][$lKey],
+                            $dataPart_current[$sKey][$lKey],
+                            $uploadedFiles[$sKey][$lKey],
+                            $dataStructure['sheets'][$sKey]['ROOT']['el'],
+                            $pParams,
+                            $callBackFunc,
+                            $sKey . '/' . $lKey . '/', $workspaceOptions
+                        );
                     }
                 }
             }
@@ -3395,7 +3415,7 @@ class DataHandler
         if ($GLOBALS['TCA'][$table]['ctrl']['origUid']) {
             $data[$table][$theNewID][$GLOBALS['TCA'][$table]['ctrl']['origUid']] = $uid;
         }
-        // Do the copy by simply submitting the array through TCEmain:
+        // Do the copy by simply submitting the array through DataHandler:
         /** @var $copyTCE DataHandler */
         $copyTCE = $this->getLocalTCE();
         $copyTCE->start($data, '', $this->BE_USER);
@@ -3509,13 +3529,27 @@ class DataHandler
                     $queryBuilder
                         ->select(...$fields)
                         ->from($table)
-                        ->where($queryBuilder->expr()->eq('pid', (int)$uid));
+                        ->where($queryBuilder->expr()->eq(
+                            'pid',
+                            $queryBuilder->createNamedParameter($uid, \PDO::PARAM_INT))
+                        );
                     if ($isTableWorkspaceEnabled && (int)$this->BE_USER->workspace === 0) {
                         // Table is workspace enabled, user is in default ws -> add t3ver_wsid=0 restriction
-                        $queryBuilder->andWhere($queryBuilder->expr()->eq('t3ver_wsid', 0));
+                        $queryBuilder->andWhere(
+                            $queryBuilder->expr()->eq(
+                                't3ver_wsid',
+                                $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT)
+                            )
+                        );
                     } elseif ($isTableWorkspaceEnabled) {
                         // Table is workspace enabled, user has a ws selected -> select wsid=0 and selected wsid rows
-                        $queryBuilder->andWhere($queryBuilder->expr()->in('t3ver_wsid', [0, (int)$this->BE_USER->workspace]));
+                        $queryBuilder->andWhere($queryBuilder->expr()->in(
+                            't3ver_wsid',
+                            $queryBuilder->createNamedParameter(
+                                [0, $this->BE_USER->workspace],
+                                Connection::PARAM_INT_ARRAY
+                            )
+                        ));
                     }
                     if (!empty($GLOBALS['TCA'][$table]['ctrl']['sortby'])) {
                         $queryBuilder->orderBy($GLOBALS['TCA'][$table]['ctrl']['sortby'], 'DESC');
@@ -3567,7 +3601,7 @@ class DataHandler
     /**
      * Copying records, but makes a "raw" copy of a record.
      * Basically the only thing observed is field processing like the copying of files and correction of ids. All other fields are 1-1 copied.
-     * Technically the copy is made with THIS instance of the tcemain class contrary to copyRecord() which creates a new instance and uses the processData() function.
+     * Technically the copy is made with THIS instance of the DataHandler class contrary to copyRecord() which creates a new instance and uses the processData() function.
      * The copy is created by insertNewCopyVersion() which bypasses most of the regular input checking associated with processData() - maybe copyRecord() should even do this as well!?
      * This function is used to create new versions of a record.
      * NOTICE: DOES NOT CHECK PERMISSIONS to create! And since page permissions are just passed through and not changed to the user who executes the copy we cannot enforce permissions without getting an incomplete copy - unless we change permissions of course.
@@ -3705,7 +3739,7 @@ class DataHandler
      */
     public function copyRecord_procBasedOnFieldType($table, $uid, $field, $value, $row, $conf, $realDestPid, $language = 0, array $workspaceOptions = [])
     {
-        // Process references and files, currently that means only the files, prepending absolute paths (so the TCEmain engine will detect the file as new and one that should be made into a copy)
+        // Process references and files, currently that means only the files, prepending absolute paths (so the DataHandler engine will detect the file as new and one that should be made into a copy)
         $value = $this->copyRecord_procFilesRefs($conf, $uid, $value);
         $inlineSubType = $this->getInlineFieldType($conf);
         // Get the localization mode for the current (parent) record (keep|select):
@@ -3719,11 +3753,18 @@ class DataHandler
         // For "flex" fieldtypes we need to traverse the structure for two reasons: If there are file references they have to be prepended with absolute paths and if there are database reference they MIGHT need to be remapped (still done in remapListedDBRecords())
         if ($conf['type'] == 'flex') {
             // Get current value array:
-            $dataStructArray = BackendUtility::getFlexFormDS($conf, $row, $table, $field);
+            $flexFormTools = GeneralUtility::makeInstance(FlexFormTools::class);
+            $dataStructureIdentifier = $flexFormTools->getDataStructureIdentifier(
+                [ 'config' => $conf ],
+                $table,
+                $field,
+                $row
+            );
+            $dataStructureArray = $flexFormTools->parseDataStructureByIdentifier($dataStructureIdentifier);
             $currentValueArray = GeneralUtility::xml2array($value);
             // Traversing the XML structure, processing files:
             if (is_array($currentValueArray)) {
-                $currentValueArray['data'] = $this->checkValue_flex_procInData($currentValueArray['data'], [], [], $dataStructArray, [$table, $uid, $field, $realDestPid], 'copyRecord_flexFormCallBack', $workspaceOptions);
+                $currentValueArray['data'] = $this->checkValue_flex_procInData($currentValueArray['data'], [], [], $dataStructureArray, [$table, $uid, $field, $realDestPid], 'copyRecord_flexFormCallBack', $workspaceOptions);
                 // Setting value as an array! -> which means the input will be processed according to the 'flex' type when the new copy is created.
                 $value = $currentValueArray;
             }
@@ -3948,7 +3989,7 @@ class DataHandler
                 }
             }
         }
-        // Implode the new filelist into the new value (all files have absolute paths now which means they will get copied when entering TCEmain as new values...)
+        // Implode the new filelist into the new value (all files have absolute paths now which means they will get copied when entering DataHandler as new values...)
         $value = implode(',', $newValue);
 
         // Return the new value:
@@ -3977,11 +4018,26 @@ class DataHandler
             ->select('*')
             ->from('sys_refindex')
             ->where(
-                $queryBuilder->expr()->eq('ref_table', $queryBuilder->createNamedParameter('_FILE')),
-                $queryBuilder->expr()->like('ref_string', $queryBuilder->createNamedParameter('%/RTEmagic%')),
-                $queryBuilder->expr()->eq('softref_key', $queryBuilder->createNamedParameter('images')),
-                $queryBuilder->expr()->eq('tablename', $queryBuilder->createNamedParameter($table)),
-                $queryBuilder->expr()->eq('recuid', (int)$theNewSQLID)
+                $queryBuilder->expr()->eq(
+                    'ref_table',
+                    $queryBuilder->createNamedParameter('_FILE', \PDO::PARAM_STR)
+                ),
+                $queryBuilder->expr()->like(
+                    'ref_string',
+                    $queryBuilder->createNamedParameter('%/RTEmagic%', \PDO::PARAM_STR)
+                ),
+                $queryBuilder->expr()->eq(
+                    'softref_key',
+                    $queryBuilder->createNamedParameter('images', \PDO::PARAM_STR)
+                ),
+                $queryBuilder->expr()->eq(
+                    'tablename',
+                    $queryBuilder->createNamedParameter($table, \PDO::PARAM_STR)
+                ),
+                $queryBuilder->expr()->eq(
+                    'recuid',
+                    $queryBuilder->createNamedParameter($theNewSQLID, \PDO::PARAM_INT)
+                )
             )
             ->orderBy('sorting', 'DESC')
             ->execute()
@@ -4491,16 +4547,28 @@ class DataHandler
             return false;
         }
 
-        if ($row[$GLOBALS['TCA'][$table]['ctrl']['languageField']] > 0 && $table !== 'pages') {
-            if ($this->enableLogging) {
-                $this->newlog('Localization failed; Source record had another language than "Default" or "All" defined!', 1);
+        // Make sure that records which are translated from another language than the default language have a correct
+        // localization source set themselves, before translating them to another language.
+        if ((int)$row[$GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField']] !== 0
+            && $row[$GLOBALS['TCA'][$table]['ctrl']['languageField']] > 0
+            && $table !== 'pages') {
+            $localizationParentRecord = BackendUtility::getRecord(
+                $table,
+                $row[$GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField']]);
+            if ((int)$localizationParentRecord[$GLOBALS['TCA'][$table]['ctrl']['languageField']] !== 0) {
+                if ($this->enableLogging) {
+                    $this->newlog('Localization failed; Source record contained a reference to an original record that is not a default record (which is strange)!', 1);
+                }
+                return false;
             }
-            return false;
         }
 
-        if ($row[$GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField']] != 0 && $table !== 'pages') {
+        // Default language records must never have a localization parent as they are the origin of any translation.
+        if ((int)$row[$GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField']] !== 0
+            && (int)$row[$GLOBALS['TCA'][$table]['ctrl']['languageField']] === 0
+            && $table !== 'pages') {
             if ($this->enableLogging) {
-                $this->newlog('Localization failed; Source record contained a reference to an original default record (which is strange)!', 1);
+                $this->newlog('Localization failed; Source record contained a reference to an original default record but is a default record itself (which is strange)!', 1);
             }
             return false;
         }
@@ -4525,7 +4593,12 @@ class DataHandler
         $excludeFields = [];
         // Set override values:
         $overrideValues[$GLOBALS['TCA'][$Ttable]['ctrl']['languageField']] = $langRec['uid'];
-        $overrideValues[$GLOBALS['TCA'][$Ttable]['ctrl']['transOrigPointerField']] = $uid;
+        // If the translated record is a default language record, set it's uid as localization parent of the new record.
+        // If translating from any other language, no override is needed; we just can copy the localization parent of
+        // the original record (which is pointing to the correspondent default language record) to the new record.
+        if ($row[$GLOBALS['TCA'][$table]['ctrl']['languageField']] === 0 || $table === 'pages') {
+            $overrideValues[$GLOBALS['TCA'][$Ttable]['ctrl']['transOrigPointerField']] = $uid;
+        }
         // Copy the type (if defined in both tables) from the original record so that translation has same type as original record
         if (isset($GLOBALS['TCA'][$table]['ctrl']['type']) && isset($GLOBALS['TCA'][$Ttable]['ctrl']['type'])) {
             $overrideValues[$GLOBALS['TCA'][$Ttable]['ctrl']['type']] = $row[$GLOBALS['TCA'][$table]['ctrl']['type']];
@@ -4927,7 +5000,7 @@ class DataHandler
                 $result = $queryBuilder
                     ->select(...$fileFieldArr)
                     ->from($table)
-                    ->where($queryBuilder->expr()->eq('uid', (int)$uid))
+                    ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($uid, \PDO::PARAM_INT)))
                     ->execute();
                 if ($row = $result->fetch()) {
                     $fArray = $fileFieldArr;
@@ -5078,7 +5151,10 @@ class DataHandler
                     $statement = $queryBuilder
                         ->select('uid')
                         ->from($table)
-                        ->where($queryBuilder->expr()->eq('pid', (int)$uid))
+                        ->where($queryBuilder->expr()->eq(
+                            'pid',
+                            $queryBuilder->createNamedParameter($uid, \PDO::PARAM_INT)
+                        ))
                         ->execute();
 
                     while ($row = $statement->fetch()) {
@@ -5420,10 +5496,10 @@ class DataHandler
             ->from($table)
             ->where($queryBuilder->expr()->orX(
                 $queryBuilder->expr()->andX(
-                    $queryBuilder->expr()->eq('pid', -1),
-                    $queryBuilder->expr()->eq('t3ver_oid', $id)
+                    $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter(-1, \PDO::PARAM_INT)),
+                    $queryBuilder->expr()->eq('t3ver_oid', $queryBuilder->createNamedParameter($id, \PDO::PARAM_INT))
                 ),
-                $queryBuilder->expr()->eq('uid', $id)
+                $queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($id, \PDO::PARAM_INT))
             ))
             ->orderBy('t3ver_id', 'DESC')
             ->setMaxResults(1)
@@ -5486,6 +5562,7 @@ class DataHandler
         $currentRec = BackendUtility::getRecord($table, $id);
         $swapRec = BackendUtility::getRecord($table, $swapWith);
         $this->version_remapMMForVersionSwap_reg = [];
+        $flexFormTools = GeneralUtility::makeInstance(FlexFormTools::class);
         foreach ($GLOBALS['TCA'][$table]['columns'] as $field => $fConf) {
             $conf = $fConf['config'];
             if ($this->isReferenceField($conf)) {
@@ -5507,16 +5584,28 @@ class DataHandler
                 }
             } elseif ($conf['type'] == 'flex') {
                 // Current record
-                $dataStructArray = BackendUtility::getFlexFormDS($conf, $currentRec, $table, $field);
+                $dataStructureIdentifier = $flexFormTools->getDataStructureIdentifier(
+                    $fConf,
+                    $table,
+                    $field,
+                    $currentRec
+                );
+                $dataStructureArray = $flexFormTools->parseDataStructureByIdentifier($dataStructureIdentifier);
                 $currentValueArray = GeneralUtility::xml2array($currentRec[$field]);
                 if (is_array($currentValueArray)) {
-                    $this->checkValue_flex_procInData($currentValueArray['data'], [], [], $dataStructArray, [$table, $id, $field], 'version_remapMMForVersionSwap_flexFormCallBack');
+                    $this->checkValue_flex_procInData($currentValueArray['data'], [], [], $dataStructureArray, [$table, $id, $field], 'version_remapMMForVersionSwap_flexFormCallBack');
                 }
                 // Swap record
-                $dataStructArray = BackendUtility::getFlexFormDS($conf, $swapRec, $table, $field);
+                $dataStructureIdentifier = $flexFormTools->getDataStructureIdentifier(
+                    $fConf,
+                    $table,
+                    $field,
+                    $swapRec
+                );
+                $dataStructureArray = $flexFormTools->parseDataStructureByIdentifier($dataStructureIdentifier);
                 $currentValueArray = GeneralUtility::xml2array($swapRec[$field]);
                 if (is_array($currentValueArray)) {
-                    $this->checkValue_flex_procInData($currentValueArray['data'], [], [], $dataStructArray, [$table, $swapWith, $field], 'version_remapMMForVersionSwap_flexFormCallBack');
+                    $this->checkValue_flex_procInData($currentValueArray['data'], [], [], $dataStructureArray, [$table, $swapWith, $field], 'version_remapMMForVersionSwap_flexFormCallBack');
                 }
             }
         }
@@ -5615,6 +5704,7 @@ class DataHandler
     public function remapListedDBRecords()
     {
         if (!empty($this->registerDBList)) {
+            $flexFormTools = GeneralUtility::makeInstance(FlexFormTools::class);
             foreach ($this->registerDBList as $table => $records) {
                 foreach ($records as $uid => $fields) {
                     $newData = [];
@@ -5638,10 +5728,16 @@ class DataHandler
                                     if (is_array($origRecordRow)) {
                                         BackendUtility::workspaceOL($table, $origRecordRow);
                                         // Get current data structure and value array:
-                                        $dataStructArray = BackendUtility::getFlexFormDS($conf, $origRecordRow, $table, $fieldName);
+                                        $dataStructureIdentifier = $flexFormTools->getDataStructureIdentifier(
+                                            [ 'config' => $conf ],
+                                            $table,
+                                            $fieldName,
+                                            $origRecordRow
+                                        );
+                                        $dataStructureArray = $flexFormTools->parseDataStructureByIdentifier($dataStructureIdentifier);
                                         $currentValueArray = GeneralUtility::xml2array($origRecordRow[$fieldName]);
                                         // Do recursive processing of the XML data:
-                                        $currentValueArray['data'] = $this->checkValue_flex_procInData($currentValueArray['data'], [], [], $dataStructArray, [$table, $theUidToUpdate, $fieldName], 'remapListedDBRecords_flexFormCallBack');
+                                        $currentValueArray['data'] = $this->checkValue_flex_procInData($currentValueArray['data'], [], [], $dataStructureArray, [$table, $theUidToUpdate, $fieldName], 'remapListedDBRecords_flexFormCallBack');
                                         // The return value should be compiled back into XML, ready to insert directly in the field (as we call updateDB() directly later):
                                         if (is_array($currentValueArray['data'])) {
                                             $newData[$fieldName] = $this->checkValue_flexArray2Xml($currentValueArray, true);
@@ -6054,7 +6150,7 @@ class DataHandler
      * @param string $table Table name of the parent record
      * @param int $id Uid of the parent record
      * @param array $incomingFieldArray Reference to the incomingFieldArray of process_datamap
-     * @param array $registerDBList Reference to the $registerDBList array that was created/updated by versionizing calls to TCEmain in process_datamap.
+     * @param array $registerDBList Reference to the $registerDBList array that was created/updated by versionizing calls to DataHandler in process_datamap.
      * @return void
      */
     public function getVersionizedIncomingFieldArray($table, $id, &$incomingFieldArray, &$registerDBList)
@@ -6306,7 +6402,7 @@ class DataHandler
                 $output = $queryBuilder
                     ->select('uid', 'pid')
                     ->from($table)
-                    ->where($queryBuilder->expr()->eq('uid', (int)$id))
+                    ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($id, \PDO::PARAM_INT)))
                     ->execute()
                     ->fetch();
                 BackendUtility::fixVersioningPid($table, $output, true);
@@ -6346,14 +6442,20 @@ class DataHandler
         $queryBuilder
             ->select('uid')
             ->from('pages')
-            ->where($queryBuilder->expr()->eq('uid', (int)$id));
+            ->where($queryBuilder->expr()->eq(
+                'uid',
+                $queryBuilder->createNamedParameter($id, \PDO::PARAM_INT)
+            ));
         if ($perms && !$this->admin) {
             $queryBuilder->andWhere($this->BE_USER->getPagePermsClause($perms));
         }
         if (!$this->admin && $GLOBALS['TCA']['pages']['ctrl']['editlock'] &&
             $perms & Permission::PAGE_EDIT + Permission::PAGE_DELETE + Permission::CONTENT_EDIT
         ) {
-            $queryBuilder->andWhere($queryBuilder->expr()->eq($GLOBALS['TCA']['pages']['ctrl']['editlock'], 0));
+            $queryBuilder->andWhere($queryBuilder->expr()->eq(
+                $GLOBALS['TCA']['pages']['ctrl']['editlock'],
+                $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT)
+            ));
         }
         return $queryBuilder;
     }
@@ -6381,7 +6483,7 @@ class DataHandler
             $result = $queryBuilder
                 ->select('uid', 'perms_userid', 'perms_groupid', 'perms_user', 'perms_group', 'perms_everybody')
                 ->from('pages')
-                ->where($queryBuilder->expr()->eq('pid', (int)$pid))
+                ->where($queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter($pid, \PDO::PARAM_INT)))
                 ->orderBy('sorting')
                 ->execute();
             while ($row = $result->fetch()) {
@@ -6451,7 +6553,7 @@ class DataHandler
             $result = $queryBuilder
                 ->select('pid', 'uid', 't3ver_oid', 't3ver_wsid')
                 ->from('pages')
-                ->where($queryBuilder->expr()->eq('uid', (int)$destinationId))
+                ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($destinationId, \PDO::PARAM_INT)))
                 ->execute();
             if ($row = $result->fetch()) {
                 BackendUtility::fixVersioningPid('pages', $row);
@@ -6519,7 +6621,10 @@ class DataHandler
                 $count = $queryBuilder
                     ->count('uid')
                     ->from($table)
-                    ->where($queryBuilder->expr()->eq('pid', (int)$page_uid))
+                    ->where($queryBuilder->expr()->eq(
+                        'pid',
+                        $queryBuilder->createNamedParameter($page_uid, \PDO::PARAM_INT)
+                    ))
                     ->execute()
                     ->fetchColumn(0);
                 if ($count) {
@@ -6551,7 +6656,7 @@ class DataHandler
             $row = $queryBuilder
                 ->select('*')
                 ->from('pages')
-                ->where($queryBuilder->expr()->eq('uid', (int)$id))
+                ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($id, \PDO::PARAM_INT)))
                 ->execute()
                 ->fetch();
             if ($row) {
@@ -6581,7 +6686,7 @@ class DataHandler
         $result = $queryBuilder
             ->select(...GeneralUtility::trimExplode(',', $fieldList))
             ->from($table)
-            ->where($queryBuilder->expr()->eq('uid', (int)$id))
+            ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($id, \PDO::PARAM_INT)))
             ->execute()
             ->fetch();
         return $result ?: null;
@@ -6801,7 +6906,7 @@ class DataHandler
             $row = $queryBuilder
                 ->select('*')
                 ->from($table)
-                ->where($queryBuilder->expr()->eq('uid', (int)$id))
+                ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($id, \PDO::PARAM_INT)))
                 ->execute()
                 ->fetch();
 
@@ -6911,7 +7016,7 @@ class DataHandler
             if ($pid >= 0) {
                 // Fetches the first record under this pid
                 $row = $queryBuilder
-                    ->where($queryBuilder->expr()->eq('pid', (int)$pid))
+                    ->where($queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter($pid, \PDO::PARAM_INT)))
                     ->orderBy($sortRow, 'ASC')
                     ->setMaxResults(1)
                     ->execute()
@@ -6940,7 +7045,10 @@ class DataHandler
                 // Sorting number is inside the list
                 // Fetches the record which is supposed to be the prev record
                 $row = $queryBuilder
-                    ->where($queryBuilder->expr()->eq('uid', abs($pid)))
+                    ->where($queryBuilder->expr()->eq(
+                        'uid',
+                        $queryBuilder->createNamedParameter(abs($pid), \PDO::PARAM_INT)
+                    ))
                     ->execute()
                     ->fetch();
 
@@ -6965,8 +7073,14 @@ class DataHandler
                             ->select($sortRow, 'pid', 'uid')
                             ->from($table)
                             ->where(
-                                $queryBuilder->expr()->eq('pid', (int)$row['pid']),
-                                $queryBuilder->expr()->gte($sortRow, (int)$row[$sortRow])
+                                $queryBuilder->expr()->eq(
+                                    'pid',
+                                    $queryBuilder->createNamedParameter($row['pid'], \PDO::PARAM_INT)
+                                ),
+                                $queryBuilder->expr()->gte(
+                                    $sortRow,
+                                    $queryBuilder->createNamedParameter($row[$sortRow], \PDO::PARAM_INT)
+                                )
                             )
                             ->orderBy($sortRow, 'ASC')
                             ->setMaxResults(2)
@@ -7029,7 +7143,7 @@ class DataHandler
             $result = $queryBuilder
                 ->select('uid')
                 ->from($table)
-                ->where($queryBuilder->expr()->eq('pid', (int)$pid))
+                ->where($queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter($pid, \PDO::PARAM_INT)))
                 ->orderBy($sortRow, 'ASC')
                 ->execute();
             while ($row = $result->fetch()) {
@@ -7083,16 +7197,29 @@ class DataHandler
                     ->select(...$select)
                     ->from($table)
                     ->where(
-                        $queryBuilder->expr()->eq('pid', (int)$pid),
-                        $queryBuilder->expr()->eq('sys_language_uid', 0),
-                        $queryBuilder->expr()->lt($sortRow, (int)$row[$sortRow])
+                        $queryBuilder->expr()->eq(
+                            'pid',
+                            $queryBuilder->createNamedParameter($pid, \PDO::PARAM_INT)
+                        ),
+                        $queryBuilder->expr()->eq(
+                            'sys_language_uid',
+                            $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT)
+                        ),
+                        $queryBuilder->expr()->lt(
+                            $sortRow,
+                            $queryBuilder->createNamedParameter($row[$sortRow], \PDO::PARAM_INT)
+                        )
                     )
                     ->orderBy($sortRow, 'DESC')
                     ->setMaxResults(1);
                 if ($table === 'tt_content') {
-                    $queryBuilder->andWhere(
-                        $queryBuilder->expr()->eq('colPos', (int)$row['colPos'])
-                    );
+                    $queryBuilder
+                        ->andWhere(
+                            $queryBuilder->expr()->eq(
+                                'colPos',
+                                $queryBuilder->createNamedParameter($row['colPos'], \PDO::PARAM_INT)
+                            )
+                        );
                 }
                 // If there is an element, find its localized record in specified localization language
                 if ($previousRow = $queryBuilder->execute()->fetch()) {
@@ -7185,7 +7312,7 @@ class DataHandler
                 $queryBuilder
                     ->select('uid')
                     ->from('sys_language')
-                    ->where($queryBuilder->expr()->eq('pid', 0));
+                    ->where($queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT)));
                 $rows = array_merge([['uid' => 0]], $queryBuilder->execute()->fetchAll(), [['uid' => -1]]);
                 foreach ($rows as $r) {
                     if ($this->BE_USER->checkLanguageAccess($r['uid'])) {
@@ -7228,7 +7355,7 @@ class DataHandler
         $queryBuilder->getRestrictions()->removeAll();
         $currentRecord = $queryBuilder->select('*')
             ->from($table)
-            ->where($queryBuilder->expr()->eq('uid', (int)$id))
+            ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($id, \PDO::PARAM_INT)))
             ->execute()
             ->fetch();
         // If the current record exists (which it should...), begin comparison:
@@ -7470,7 +7597,7 @@ class DataHandler
             ->removeAll();
         $queryBuilder->select('pid')
             ->from($table)
-            ->where($queryBuilder->expr()->eq('uid', (int)$uid));
+            ->where($queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter($uid, \PDO::PARAM_INT)));
         if ($row = $queryBuilder->execute()->fetch()) {
             return $row['pid'];
         }
@@ -7527,15 +7654,20 @@ class DataHandler
             $queryBuilder
                 ->select('uid')
                 ->from('pages')
-                ->where($queryBuilder->expr()->eq('pid', (int)$pid))
+                ->where($queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter($pid, \PDO::PARAM_INT)))
                 ->orderBy('sorting', 'DESC');
             if (!$this->admin) {
                 $queryBuilder->andWhere($this->BE_USER->getPagePermsClause($this->pMap['show']));
             }
             if ((int)$this->BE_USER->workspace === 0) {
-                $queryBuilder->andWhere($queryBuilder->expr()->eq('t3ver_wsid', 0));
+                $queryBuilder->andWhere(
+                    $queryBuilder->expr()->eq('t3ver_wsid', $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT))
+                );
             } else {
-                $queryBuilder->andWhere($queryBuilder->expr()->in('t3ver_wsid', [0, (int)$this->BE_USER->workspace]));
+                $queryBuilder->andWhere($queryBuilder->expr()->in(
+                    't3ver_wsid',
+                    $queryBuilder->createNamedParameter([0, $this->BE_USER->workspace], Connection::PARAM_INT_ARRAY)
+                ));
             }
             $result = $queryBuilder->execute();
 
@@ -7750,8 +7882,8 @@ class DataHandler
                 ->count('uid')
                 ->from($table)
                 ->where(
-                    $queryBuilder->expr()->eq('pid', (int)$pid),
-                    $queryBuilder->expr()->eq($field, $queryBuilder->createNamedParameter($checkTitle))
+                    $queryBuilder->expr()->eq('pid', $queryBuilder->createNamedParameter($pid, \PDO::PARAM_INT)),
+                    $queryBuilder->expr()->eq($field, $queryBuilder->createNamedParameter($checkTitle, \PDO::PARAM_STR))
                 )
                 ->execute()
                 ->fetchColumn(0);
@@ -7797,7 +7929,7 @@ class DataHandler
             $row = $query
                 ->select('pid')
                 ->from($table)
-                ->where($query->expr()->eq('uid', abs($pid)))
+                ->where($query->expr()->eq('uid', $query->createNamedParameter(abs($pid), \PDO::PARAM_INT)))
                 ->execute()
                 ->fetch();
             // Look, if the record UID happens to be an offline record. If so, find its live version.
@@ -7876,7 +8008,10 @@ class DataHandler
                     ->add(GeneralUtility::makeInstance(DeletedRestriction::class));
                 $count = $query->count('uid')
                     ->from($table)
-                    ->where($query->expr()->in('pid', $inList))
+                    ->where($query->expr()->in(
+                        'pid',
+                        $query->createNamedParameter($inList, Connection::PARAM_INT_ARRAY)
+                    ))
                     ->execute()
                     ->fetchColumn(0);
                 if ($count && ($this->tableReadOnly($table) || !$this->checkModifyAccessList($table))) {
@@ -8016,7 +8151,7 @@ class DataHandler
                     ->from('pages', 'A')
                     ->from('pages', 'B')
                     ->where(
-                        $queryBuilder->expr()->eq('A.uid', (int)$pageUid),
+                        $queryBuilder->expr()->eq('A.uid', $queryBuilder->createNamedParameter($pageUid, \PDO::PARAM_INT)),
                         $queryBuilder->expr()->eq('B.pid', $queryBuilder->quoteIdentifier('A.pid'))
                     )
                     ->execute();
@@ -8034,9 +8169,10 @@ class DataHandler
                         $siblingChildren = $siblingChildrenQuery
                             ->select('uid')
                             ->from('pages')
-                            ->where(
-                                $siblingChildrenQuery->expr()->eq('pid', (int)$row_tmp['uid'])
-                            )
+                            ->where($siblingChildrenQuery->expr()->eq(
+                                'pid',
+                                $queryBuilder->createNamedParameter($row_tmp['uid'], \PDO::PARAM_INT)
+                            ))
                             ->execute();
                         while ($row_tmp2 = $siblingChildren->fetch()) {
                             $pageIdsThatNeedCacheFlush[] = (int)$row_tmp2['uid'];
@@ -8054,9 +8190,10 @@ class DataHandler
                     $row_tmp = $parentQuery
                         ->select('pid')
                         ->from('pages')
-                        ->where(
-                            $parentQuery->expr()->eq('uid', (int)$pid_tmp)
-                        )
+                        ->where($parentQuery->expr()->eq(
+                            'uid',
+                            $queryBuilder->createNamedParameter($pid_tmp, \PDO::PARAM_INT)
+                        ))
                         ->execute()
                         ->fetch();
                     if (!empty($row_tmp)) {
@@ -8228,7 +8365,7 @@ class DataHandler
      *
      *****************************/
     /**
-     * Logging actions from TCEmain
+     * Logging actions from DataHandler
      *
      * @param string $table Table name the log entry is concerned with. Blank if NA
      * @param int $recuid Record UID. Zero if NA
@@ -8309,11 +8446,17 @@ class DataHandler
             ->select('*')
             ->from('sys_log')
             ->where(
-                $queryBuilder->expr()->eq('type', 1),
-                $queryBuilder->expr()->lt('action', 256),
-                $queryBuilder->expr()->eq('userid', (int)$this->BE_USER->user['uid']),
-                $queryBuilder->expr()->eq('tstamp', (int)$GLOBALS['EXEC_TIME']),
-                $queryBuilder->expr()->neq('error', 0)
+                $queryBuilder->expr()->eq('type', $queryBuilder->createNamedParameter(1, \PDO::PARAM_INT)),
+                $queryBuilder->expr()->lt('action', $queryBuilder->createNamedParameter(256, \PDO::PARAM_INT)),
+                $queryBuilder->expr()->eq(
+                    'userid',
+                    $queryBuilder->createNamedParameter($this->BE_USER->user['uid'], \PDO::PARAM_INT)
+                ),
+                $queryBuilder->expr()->eq(
+                    'tstamp',
+                    $queryBuilder->createNamedParameter($GLOBALS['EXEC_TIME'], \PDO::PARAM_INT)
+                ),
+                $queryBuilder->expr()->neq('error', $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT))
             )
             ->execute();
 
