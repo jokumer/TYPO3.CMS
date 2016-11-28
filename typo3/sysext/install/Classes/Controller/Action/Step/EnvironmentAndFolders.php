@@ -117,6 +117,7 @@ class EnvironmentAndFolders extends AbstractStepAction
         /** @var $statusUtility \TYPO3\CMS\Install\Status\StatusUtility */
         $structureErrors = $statusUtility->filterBySeverity($structureMessages, 'error');
         $this->view->assign('structureErrors', $structureErrors);
+        $this->view->assign('context', $this->getContext());
 
         if (!empty($environmentStatus['error']) || !empty($environmentStatus['warning']) || !empty($structureErrors)) {
             $this->view->assign('errorsOrWarningsFromStatus', true);

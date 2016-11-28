@@ -30,6 +30,31 @@ abstract class AbstractStepAction extends \TYPO3\CMS\Install\Controller\Action\A
     protected $totalSteps = 0;
 
     /**
+     * @var string Context of install tool, backend or standalone
+     */
+    protected $context = '';
+
+    /**
+     * Stores the context of install tool in specific action, standalone or backend
+     *
+     * @param string $context The current context
+     * @return void
+     */
+    public function setContext($context){
+        $this->context = $context;
+    }
+    
+    /**
+     * Gets current context
+     *
+     * @return string
+     */
+    public function getContext()
+    {
+        return $this->context;
+    }
+    
+    /**
      * Tell the action which position it has in the list of actions
      *
      * @param int $current The current position

@@ -487,6 +487,21 @@ class AbstractController
     }
 
     /**
+     * Get context of install tool.
+     * Returns the context of install tool, backend or standalone
+     * 
+     * @return string
+     */
+    protected function getContext(){
+        $getPostValues = GeneralUtility::_GP('install');
+        $context = 'standalone';
+        if (isset($getPostValues['context']) && $getPostValues['context'] === 'backend') {
+            $context = 'backend';
+        }
+        return $context;
+    }
+    
+    /**
      * HTTP redirect to self, preserving allowed GET variables.
      * WARNING: This exits the script execution!
      *
@@ -539,6 +554,8 @@ class AbstractController
         // Add action if specified
         if ((string)$action !== '') {
             $parameters[] = 'install[action]=' . $action;
+        } else if(isset($getPostValues['action'])) {
+            $parameters[] = 'install[action]=' . $getPostValues['action'];
         }
 
         $redirectLocation = 'Install.php?' . implode('&', $parameters);

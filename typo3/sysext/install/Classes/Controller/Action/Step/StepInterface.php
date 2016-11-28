@@ -36,6 +36,14 @@ interface StepInterface
     public function needsExecution();
 
     /**
+     * Stores the context of install tool in specific action, standalone or backend
+     *
+     * @param string $context the current context
+     * @return void
+     */
+    public function setContext($context);
+
+    /**
      * Tell the action which position it has in the list of actions
      *
      * @param int $current The current position

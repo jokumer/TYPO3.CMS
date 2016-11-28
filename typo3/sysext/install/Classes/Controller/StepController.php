@@ -53,6 +53,8 @@ class StepController extends AbstractController
         $this->executeSilentConfigurationUpgradesIfNeeded();
         $this->initializeSession();
         $this->checkSessionToken();
+        \TYPO3\CMS\Extbase\Utility\DebuggerUtility::var_dump(GeneralUtility::_GET(),'StepController:59');
+        return;
         $this->checkSessionLifetime();
         $this->loginIfRequested();
         $this->outputLoginFormIfNotAuthorized();
@@ -80,7 +82,7 @@ class StepController extends AbstractController
             $stepAction->setPostValues($this->getPostValues());
             $messages = $stepAction->execute();
             $this->addSessionMessages($messages);
-            $this->redirect();
+            return;
         }
     }
 
@@ -252,16 +254,19 @@ class StepController extends AbstractController
     {
         $postValues = $this->getPostValues();
 
-        $wasExecuted = false;
-        $errorMessagesFromExecute = [];
-        if (isset($postValues['action'])
-            && $postValues['action'] === 'environmentAndFolders'
-        ) {
-            /** @var \TYPO3\CMS\Install\Controller\Action\Step\StepInterface $action */
-            $action = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Controller\Action\Step\EnvironmentAndFolders::class);
-            $errorMessagesFromExecute = $action->execute();
-            $wasExecuted = true;
-        }
+        $wasExecuted = true;
+//            $errorMessagesFromExecute = [];
+//        if (isset($postValues['action'])
+//            && $postValues['action'] === 'environmentAndFolders'
+//            && !@is_dir(PATH_typo3conf)
+//        ) {
+//            /** @var \TYPO3\CMS\Install\Controller\Action\Step\StepInterface $action */
+//            $action = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Controller\Action\Step\EnvironmentAndFolders::class);
+//            $errorMessagesFromExecute = $action->execute();
+//            \TYPO3\CMS\Extbase\Utility\DebuggerUtility::var_dump(!@is_dir(PATH_typo3conf),'StepController:274');
+//            
+//            $wasExecuted = true;
+//        }
 
         /** @var \TYPO3\CMS\Install\Controller\Action\Step\StepInterface $action */
         $action = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Controller\Action\Step\EnvironmentAndFolders::class);
@@ -278,6 +283,7 @@ class StepController extends AbstractController
         if (!@is_dir(PATH_typo3conf) || $needsExecution) {
             /** @var \TYPO3\CMS\Install\Controller\Action\Step\StepInterface $action */
             $action = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Controller\Action\Step\EnvironmentAndFolders::class);
+            $errorMessagesFromExecute = $action->execute();
             if ($this->isInitialInstallationInProgress()) {
                 $currentStep = (array_search('environmentAndFolders', $this->authenticationActions) + 1);
                 $totalSteps = count($this->authenticationActions);
@@ -285,6 +291,7 @@ class StepController extends AbstractController
             }
             $action->setController('step');
             $action->setAction('environmentAndFolders');
+            $action->setContext($this->getContext());
             if (!empty($errorMessagesFromExecute)) {
                 $action->setMessages($errorMessagesFromExecute);
             }
@@ -292,7 +299,8 @@ class StepController extends AbstractController
         }
 
         if ($wasExecuted) {
-            $this->redirect();
+            return;
+//            $this->redirect();
         }
     }
 
@@ -308,7 +316,8 @@ class StepController extends AbstractController
         /** @var \TYPO3\CMS\Core\Configuration\ConfigurationManager $configurationManager */
         $configurationManager = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Configuration\ConfigurationManager::class);
         $configurationManager->setLocalConfigurationValueByPath('SYS/trustedHostsPattern', '.*');
-        $this->redirect();
+        return;
+//        $this->redirect();
     }
 
     /**
@@ -323,7 +332,8 @@ class StepController extends AbstractController
         try {
             $upgradeService->execute();
         } catch (Exception\RedirectException $e) {
-            $this->redirect();
+//            $this->redirect();
+            return;
         }
     }
 }

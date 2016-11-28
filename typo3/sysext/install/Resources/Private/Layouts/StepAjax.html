@@ -1,0 +1,15 @@
+{namespace f=TYPO3\CMS\Fluid\ViewHelpers}
+<f:if condition="{messages}">
+	<div id="t3-install-step-execution-messages">
+		<h4>Messages</h4>
+		<f:for each="{messages}" as="message">
+			<f:render partial="Action/Common/StatusMessage" arguments="{message: message}" />
+		</f:for>
+	</div>
+</f:if>
+
+<div id="t3-install-box-body">
+	<f:render section="Content" />
+</div>
+
+

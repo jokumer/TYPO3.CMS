@@ -695,7 +695,47 @@ TYPO3.Install.coreUpdate = {
 	}
 };
 
+TYPO3.Install.ajax = {
+	fetch: function(url, settings){
+
+	},
+	checkAndPrepareParameter: function(params){
+		var defaultParams ={
+			url: location.href,
+			type: 'GET',
+
+			success: function(result){
+				console.log(arguments,':530');
+			},
+			error: function(){},
+			complete: function(){}
+		};
+		//test if given parameter are valid and set some defaults to parameter not given
+
+	},
+	request: function(form, success) {
+		$.ajax({
+			// url: location.href,
+			url: $(form).attr('action'),
+			data: $(form).serialize(),
+			method: 'POST',
+			success: success
+		});
+	}
+};
+
 $(function() {
+	$('.js-form').submit(function(e){
+		TYPO3.Install.ajax.request(this,function(result){
+			$(result).each(function(){
+				if($(this).hasClass('extbase-debugger')) $(this).prependTo('body')
+			});
+			
+			//$('#t3-install-box-body').replaceWith($(result));
+		});
+		e.preventDefault();
+	});
+
 	// Used in database compare section to select/deselect checkboxes
 	$('.checkall').on('click', function() {
 		$(this).closest('fieldset').find(':checkbox').prop('checked', this.checked);
