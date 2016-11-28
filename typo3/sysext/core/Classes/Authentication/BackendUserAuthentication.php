@@ -249,10 +249,12 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
     public $writeAttemptLog = true;
 
     /**
-     * if > 0 : session-timeout in seconds.
-     * if FALSE/<0 : no timeout.
-     * if string: The string is field name from the user table where the timeout can be found.
-     * @var string|int
+     * Session timeout (on the server)
+     *
+     * If >0: session-timeout in seconds.
+     * If 0: no timeout.
+     *
+     * @var int
      */
     public $sessionTimeout = 6000;
 
@@ -300,6 +302,12 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
         parent::__construct();
         $this->name = self::getCookieName();
         $this->loginType = 'BE';
+        $this->warningEmail = $GLOBALS['TYPO3_CONF_VARS']['BE']['warning_email_addr'];
+        $this->lockIP = $GLOBALS['TYPO3_CONF_VARS']['BE']['lockIP'];
+        $this->sessionTimeout = (int)$GLOBALS['TYPO3_CONF_VARS']['BE']['sessionTimeout'];
+        if (TYPO3_REQUESTTYPE & TYPO3_REQUESTTYPE_CLI) {
+            $this->dontSetCookie = true;
+        }
     }
 
     /**
@@ -2530,10 +2538,7 @@ This is a dump of the failures:
     {
         // UC - user configuration is a serialized array inside the user object
         // If there is a saved uc we implement that instead of the default one.
-        $temp_theSavedUC = unserialize($this->user['uc']);
-        if (is_array($temp_theSavedUC)) {
-            $this->unpack_uc($temp_theSavedUC);
-        }
+        $this->unpack_uc();
         // Setting defaults if uc is empty
         $updated = false;
         $originalUc = [];

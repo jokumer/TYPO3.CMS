@@ -1015,7 +1015,7 @@ class TypoScriptFrontendController
             }
         }
         $this->fe_user->start();
-        $this->fe_user->unpack_uc('');
+        $this->fe_user->unpack_uc();
         // Gets session data
         $this->fe_user->fetchSessionData();
         $recs = GeneralUtility::_GP('recs');
@@ -1175,10 +1175,9 @@ class TypoScriptFrontendController
             // disable login-attempts to the backend account through this script
             // New backend user object
             $BE_USER = GeneralUtility::makeInstance(FrontendBackendUserAuthentication::class);
-            $BE_USER->lockIP = $GLOBALS['TYPO3_CONF_VARS']['BE']['lockIP'];
             // Object is initialized
             $BE_USER->start();
-            $BE_USER->unpack_uc('');
+            $BE_USER->unpack_uc();
             if (!empty($BE_USER->user['uid'])) {
                 $BE_USER->fetchGroupData();
                 $this->beUserLogin = true;
@@ -2238,10 +2237,8 @@ class TypoScriptFrontendController
         }
         $GET = GeneralUtility::_GET();
         if ($this->cHash && is_array($GET)) {
-            if (!isset($GET['id'])) {
-                // id not in $_GET -> home page -> use already determined id
-                $GET['id'] = $this->id;
-            }
+            // Make sure we use the page uid and not the page alias
+            $GET['id'] = $this->id;
             $this->cHash_array = $this->cacheHash->getRelevantParameters(GeneralUtility::implodeArrayForUrl('', $GET));
             $cHash_calc = $this->cacheHash->calculateCacheHash($this->cHash_array);
             if ($cHash_calc != $this->cHash) {
@@ -2585,6 +2582,9 @@ class TypoScriptFrontendController
                     // Processing for the config_array:
                     $this->config['rootLine'] = $this->tmpl->rootLine;
                     $this->config['mainScript'] = trim($this->config['config']['mainScript']) ?: 'index.php';
+                    if (isset($this->config['config']['mainScript']) || $this->config['mainScript'] !== 'index.php') {
+                        $this->logDeprecatedTyposcript('config.mainScript', 'Setting the frontend script to something else than index.php is deprecated as of TYPO3 v8, and will not be possible in TYPO3 v9 without a custom extension');
+                    }
                     // Class for render Header and Footer parts
                     if ($this->pSetup['pageHeaderFooterTemplateFile']) {
                         $file = $this->tmpl->getFileName($this->pSetup['pageHeaderFooterTemplateFile']);

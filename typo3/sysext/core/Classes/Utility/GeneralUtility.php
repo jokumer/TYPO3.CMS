@@ -1795,7 +1795,7 @@ class GeneralUtility
         if (!empty($firstLevelCache[$identifier])) {
             $array = $firstLevelCache[$identifier];
         } else {
-            $array = self::xml2arrayProcess($string, $NSprefix, $reportDocTag);
+            $array = self::xml2arrayProcess(trim($string), $NSprefix, $reportDocTag);
             // Store content in first level cache
             $firstLevelCache[$identifier] = $array;
         }
@@ -2632,7 +2632,7 @@ class GeneralUtility
      */
     public static function getBytesFromSizeMeasurement($measurement)
     {
-        $bytes = doubleval($measurement);
+        $bytes = (float)$measurement;
         if (stripos($measurement, 'G')) {
             $bytes *= 1024 * 1024 * 1024;
         } elseif (stripos($measurement, 'M')) {
@@ -3179,29 +3179,29 @@ class GeneralUtility
             // Browser version
             switch ($bInfo['BROWSER']) {
                 case 'net':
-                    $bInfo['VERSION'] = doubleval(substr($useragent, 8));
+                    $bInfo['VERSION'] = (float)substr($useragent, 8);
                     if (strpos($useragent, 'Netscape6/') !== false) {
-                        $bInfo['VERSION'] = doubleval(substr(strstr($useragent, 'Netscape6/'), 10));
+                        $bInfo['VERSION'] = (float)substr(strstr($useragent, 'Netscape6/'), 10);
                     }
                     // Will we ever know if this was a typo or intention...?! :-(
                     if (strpos($useragent, 'Netscape/6') !== false) {
-                        $bInfo['VERSION'] = doubleval(substr(strstr($useragent, 'Netscape/6'), 10));
+                        $bInfo['VERSION'] = (float)substr(strstr($useragent, 'Netscape/6'), 10);
                     }
                     if (strpos($useragent, 'Netscape/7') !== false) {
-                        $bInfo['VERSION'] = doubleval(substr(strstr($useragent, 'Netscape/7'), 9));
+                        $bInfo['VERSION'] = (float)substr(strstr($useragent, 'Netscape/7'), 9);
                     }
                     break;
                 case 'msie':
                     $tmp = strstr($useragent, 'MSIE');
-                    $bInfo['VERSION'] = doubleval(preg_replace('/^[^0-9]*/', '', substr($tmp, 4)));
+                    $bInfo['VERSION'] = (float)preg_replace('/^[^0-9]*/', '', substr($tmp, 4));
                     break;
                 case 'opera':
                     $tmp = strstr($useragent, 'Opera');
-                    $bInfo['VERSION'] = doubleval(preg_replace('/^[^0-9]*/', '', substr($tmp, 5)));
+                    $bInfo['VERSION'] = (float)preg_replace('/^[^0-9]*/', '', substr($tmp, 5));
                     break;
                 case 'konqu':
                     $tmp = strstr($useragent, 'Konqueror/');
-                    $bInfo['VERSION'] = doubleval(substr($tmp, 10));
+                    $bInfo['VERSION'] = (float)substr($tmp, 10);
                     break;
             }
             // Client system
@@ -3314,12 +3314,11 @@ class GeneralUtility
      * @param string $theFile File path to evaluate
      * @return bool TRUE, $theFile is allowed path string, FALSE otherwise
      * @see http://php.net/manual/en/security.filesystem.nullbytes.php
-     * @todo Possible improvement: Should it rawurldecode the string first to check if any of these characters is encoded?
      */
     public static function validPathStr($theFile)
     {
         return strpos($theFile, '//') === false && strpos($theFile, '\\') === false
-            && !preg_match('#(?:^\\.\\.|/\\.\\./|[[:cntrl:]])#u', $theFile);
+            && preg_match('#(?:^\\.\\.|/\\.\\./|[[:cntrl:]])#u', $theFile) === 0;
     }
 
     /**
@@ -3806,7 +3805,8 @@ class GeneralUtility
     }
 
     /**
-     * This method should be avoided, as it will be deprecated soon. Instead use makeInstance() directly.
+     * This method should be avoided, as it will be deprecated completely in TYPO3 v9, and will be removed in TYPO3 v10.
+     * Instead use makeInstance() directly.
      *
      * Creates and returns reference to a user defined object.
      * This function can return an object reference if you like.
@@ -3829,19 +3829,16 @@ class GeneralUtility
             self::deprecationLog('Using file references to resolve "' . $classRef . '" has been deprecated in TYPO3 v8 '
                 . 'when calling GeneralUtility::getUserObj(), make sure the class is available via the class loader. '
                 . 'This functionality will be removed in TYPO3 v9.');
-            list($file, $class) = self::revExplode(':', $classRef, 2);
+            list($file, $classRef) = self::revExplode(':', $classRef, 2);
             $requireFile = self::getFileAbsFileName($file);
             if ($requireFile) {
                 require_once $requireFile;
             }
-        } else {
-            $class = $classRef;
         }
 
         // Check if class exists:
-        if (class_exists($class)) {
-            $classObj = self::makeInstance($class);
-            return $classObj;
+        if (class_exists($classRef)) {
+            return self::makeInstance($classRef);
         }
     }
 
