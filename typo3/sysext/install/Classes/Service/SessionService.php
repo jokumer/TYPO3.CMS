@@ -14,6 +14,7 @@ namespace TYPO3\CMS\Install\Service;
  * The TYPO3 project - inspiring people to share!
  */
 
+use TYPO3\CMS\Core\Configuration\ConfigurationManager;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
@@ -21,6 +22,11 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  */
 class SessionService implements \TYPO3\CMS\Core\SingletonInterface
 {
+    /**
+     * @var \TYPO3\CMS\Core\Configuration\ConfigurationManager
+     */
+    protected $configurationManager;
+
     /**
      * The path to our typo3temp/var/ (where we can write our sessions). Set in the
      * constructor.
@@ -66,6 +72,7 @@ class SessionService implements \TYPO3\CMS\Core\SingletonInterface
     public function __construct()
     {
         $this->basePath = PATH_site . 'typo3temp/var/';
+        $this->configurationManager = $configurationManager ?: GeneralUtility::makeInstance(ConfigurationManager::class);
         // Start our PHP session early so that hasSession() works
         $sessionSavePath = $this->getSessionSavePath();
         // Register our "save" session handler
@@ -98,7 +105,7 @@ class SessionService implements \TYPO3\CMS\Core\SingletonInterface
      */
     private function getSessionSavePath()
     {
-        if (empty($GLOBALS['TYPO3_CONF_VARS']['SYS']['encryptionKey'])) {
+        if (empty($this->configurationManager->getLocalConfigurationValueByPath('SYS/encryptionKey'))) {
             throw new \TYPO3\CMS\Install\Exception(
                 'No encryption key set to secure session',
                 1371243449
@@ -106,7 +113,7 @@ class SessionService implements \TYPO3\CMS\Core\SingletonInterface
         }
         $sessionSavePath = sprintf(
             $this->basePath . $this->sessionPath,
-            GeneralUtility::hmac('session:' . $GLOBALS['TYPO3_CONF_VARS']['SYS']['encryptionKey'])
+            GeneralUtility::hmac('session:' . $this->configurationManager->getLocalConfigurationValueByPath('SYS/encryptionKey'))
         );
         $this->ensureSessionSavePathExists($sessionSavePath);
         return $sessionSavePath;
@@ -221,7 +228,7 @@ class SessionService implements \TYPO3\CMS\Core\SingletonInterface
      */
     private function getSessionHash($sessionId = '')
     {
-        if (empty($GLOBALS['TYPO3_CONF_VARS']['SYS']['encryptionKey'])) {
+        if (empty($this->configurationManager->getLocalConfigurationValueByPath('SYS/encryptionKey'))) {
             throw new \TYPO3\CMS\Install\Exception(
                 'No encryption key set to secure session',
                 1371243450
@@ -230,7 +237,7 @@ class SessionService implements \TYPO3\CMS\Core\SingletonInterface
         if (!$sessionId) {
             $sessionId = $this->getSessionId();
         }
-        return md5($GLOBALS['TYPO3_CONF_VARS']['SYS']['encryptionKey'] . '|' . $sessionId);
+        return md5($this->configurationManager->getLocalConfigurationValueByPath('SYS/encryptionKey') . '|' . $sessionId);
     }
 
     /**
