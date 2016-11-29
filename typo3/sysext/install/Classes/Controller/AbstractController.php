@@ -582,6 +582,21 @@ class AbstractController
     }
 
     /**
+     * Output content.
+     * WARNING: This exits the script execution!
+     *
+     * @param string $content Content to output
+     */
+    protected function outputJSON($content = '')
+    {
+        header('Content-Type: json/application; charset=utf-8');
+        header('Cache-Control: no-cache, must-revalidate');
+        header('Pragma: no-cache');
+        echo json_encode($content);
+        die;
+    }
+
+    /**
      * Get sender address from configuration
      * ['TYPO3_CONF_VARS']['MAIL']['defaultMailFromAddress']
      * If this setting is empty fall back to 'no-reply@example.com'

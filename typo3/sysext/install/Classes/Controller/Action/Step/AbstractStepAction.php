@@ -92,6 +92,7 @@ abstract class AbstractStepAction extends \TYPO3\CMS\Install\Controller\Action\A
      */
     protected function assignSteps()
     {
+        
         $steps = [];
         $currentStep = $this->getCurrentStep();
         $totalSteps = $this->getTotalSteps();

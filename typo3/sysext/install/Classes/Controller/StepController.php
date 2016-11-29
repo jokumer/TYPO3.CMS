@@ -54,10 +54,11 @@ class StepController extends AbstractController
         $this->initializeSession();
         $this->checkSessionToken();
         \TYPO3\CMS\Extbase\Utility\DebuggerUtility::var_dump(GeneralUtility::_GET(),'StepController:59');
-        return;
+//        return;
         $this->checkSessionLifetime();
         $this->loginIfRequested();
         $this->outputLoginFormIfNotAuthorized();
+        
         $this->executeSpecificStep();
         $this->outputSpecificStep();
         $this->redirectToTool();
@@ -132,6 +133,7 @@ class StepController extends AbstractController
                 $this->redirect('', $nextAction[0]);
             }
         }
+        
     }
 
     /**
@@ -295,7 +297,8 @@ class StepController extends AbstractController
             if (!empty($errorMessagesFromExecute)) {
                 $action->setMessages($errorMessagesFromExecute);
             }
-            $this->output($action->handle());
+            $this->output($action->handle(FALSE));
+            
         }
 
         if ($wasExecuted) {

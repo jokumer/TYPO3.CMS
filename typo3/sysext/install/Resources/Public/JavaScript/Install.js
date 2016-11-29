@@ -725,10 +725,14 @@ TYPO3.Install.ajax = {
 };
 
 $(function() {
-	$('.js-form').submit(function(e){
+	$(document).on('submit', '.js-form', function(e){
 		TYPO3.Install.ajax.request(this,function(result){
 			$(result).each(function(){
-				if($(this).hasClass('extbase-debugger')) $(this).prependTo('body')
+
+				// if($(this).hasClass('extbase-debugger')) $(this).prependTo('body');
+				$(document).find('.js-step-counter').replaceWith($(result).find('.js-step-counter'));
+				$(document).find('.js-step-description').replaceWith($(result).find('.js-step-description'));
+				$(document).find('.js-form').replaceWith($(result).find('.js-form'));
 			});
 			
 			//$('#t3-install-box-body').replaceWith($(result));
