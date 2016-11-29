@@ -37,17 +37,21 @@ class DatabaseSelect extends AbstractStepAction
      * Create database if needed, save selected db name in configuration
      *
      * @return \TYPO3\CMS\Install\Status\StatusInterface[]
+     * @todo Jok createNewDatabase creates database with wrong character set and coallition since we use ajax. needs to be fixed.
      */
     public function execute()
     {
         $postValues = $this->postValues['values'];
         if ($postValues['type'] === 'new') {
-            $status = $this->createNewDatabase($postValues['new']);
+            $this->createNewDatabase($postValues['new']);
+            $status = $this->checkExistingDatabase($postValues['new']);
+
             if ($status instanceof ErrorStatus) {
                 return [ $status ];
             }
         } elseif ($postValues['type'] === 'existing' && !empty($postValues['existing'])) {
             $status = $this->checkExistingDatabase($postValues['existing']);
+
             if ($status instanceof ErrorStatus) {
                 return [ $status ];
             }

@@ -726,18 +726,29 @@ TYPO3.Install.ajax = {
 
 $(function() {
 	$(document).on('submit', '.js-form', function(e){
-		TYPO3.Install.ajax.request(this,function(result){
-			$(result).each(function(){
+		if(!$(this).hasClass('js-no-preventdefault')){
+			TYPO3.Install.ajax.request(this,function(result){
+				$(document).find('#t3-install-step-execution-messages').remove();
+				$(result).each(function(idx, el){
+					el = $(el);
+					if(el.attr('id') === 't3-install-step-execution-messages') {
+						el.insertAfter($('h2'));
+					}
 
-				// if($(this).hasClass('extbase-debugger')) $(this).prependTo('body');
-				$(document).find('.js-step-counter').replaceWith($(result).find('.js-step-counter'));
-				$(document).find('.js-step-description').replaceWith($(result).find('.js-step-description'));
-				$(document).find('.js-form').replaceWith($(result).find('.js-form'));
+					if(el.attr('id') === 't3-install-box-body') {
+
+						// if($(this).hasClass('extbase-debugger')) $(this).prependTo('body');
+						$(document).find('.js-step-counter').replaceWith(el.find('.js-step-counter'));
+						$(document).find('.js-step-description').replaceWith(el.find('.js-step-description'));
+						$(document).find('.js-form').replaceWith(el.find('.js-form'));
+					}
+				});
+
+				//$('#t3-install-box-body').replaceWith($(result));
 			});
-			
-			//$('#t3-install-box-body').replaceWith($(result));
-		});
-		e.preventDefault();
+			e.preventDefault();			
+		}
+
 	});
 
 	// Used in database compare section to select/deselect checkboxes
