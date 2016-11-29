@@ -365,7 +365,7 @@ class AbstractController
         $localConfigurationFileExists = @is_file($localConfigurationFileLocation);
         $result = false;
         if (!$localConfigurationFileExists
-            || !empty($GLOBALS['TYPO3_CONF_VARS']['SYS']['isInitialInstallationInProgress'])
+            || !empty($configurationManager->getLocalConfigurationValueByPath('SYS/isInitialInstallationInProgress'))
         ) {
             $result = true;
         }
