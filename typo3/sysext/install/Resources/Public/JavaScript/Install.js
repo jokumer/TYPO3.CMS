@@ -696,9 +696,6 @@ TYPO3.Install.coreUpdate = {
 };
 
 TYPO3.Install.ajax = {
-	fetch: function(url, settings){
-
-	},
 	checkAndPrepareParameter: function(params){
 		var defaultParams ={
 			url: location.href,
@@ -734,14 +731,17 @@ $(function() {
 					if(el.attr('id') === 't3-install-step-execution-messages') {
 						el.insertAfter($('h2'));
 					}
-
 					if(el.attr('id') === 't3-install-box-body') {
+						// if($(this).hasClass('extbase-debugger')) $(this).prependTo('body');
+						$(document).find('#t3-install-box-body').replaceWith(el);
+					}
+					/*if(el.attr('id') === 't3-install-box-body') {
 
 						// if($(this).hasClass('extbase-debugger')) $(this).prependTo('body');
 						$(document).find('.js-step-counter').replaceWith(el.find('.js-step-counter'));
 						$(document).find('.js-step-description').replaceWith(el.find('.js-step-description'));
 						$(document).find('.js-form').replaceWith(el.find('.js-form'));
-					}
+					}*/
 				});
 
 				//$('#t3-install-box-body').replaceWith($(result));

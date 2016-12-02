@@ -251,7 +251,7 @@ class StepController extends AbstractController
      */
     protected function executeOrOutputFirstInstallStepIfNeeded()
     {
-        $postValues = $this->getPostValues();
+//        $postValues = $this->getPostValues();
 
         $wasExecuted = true;
 //            $errorMessagesFromExecute = [];
