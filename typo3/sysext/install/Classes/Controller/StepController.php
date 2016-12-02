@@ -47,18 +47,29 @@ class StepController extends AbstractController
         $this->loadBaseExtensions();
         $this->outputInstallToolNotEnabledMessageIfNeeded();
         $this->outputInstallToolPasswordNotSetMessageIfNeeded();
-        $this->recreatePackageStatesFileIfNotExisting();
-        $this->executeOrOutputFirstInstallStepIfNeeded();
-        $this->adjustTrustedHostsPatternIfNeeded();
-        $this->executeSilentConfigurationUpgradesIfNeeded();
-        $this->initializeSession();
-        $this->checkSessionToken();
-        $this->checkSessionLifetime();
-        $this->loginIfRequested();
-        $this->outputLoginFormIfNotAuthorized();
-        $this->executeSpecificStep();
-        $this->outputSpecificStep();
-        $this->redirectToTool();
+        if ($this->isExecutedEnvironmentAndFolders()) {
+            $this->recreatePackageStatesFileIfNotExisting();
+            $this->adjustTrustedHostsPatternIfNeeded();
+            $this->executeSilentConfigurationUpgradesIfNeeded();
+            $this->initializeSession();
+            $this->checkSessionToken();
+            $this->checkSessionLifetime();
+            $this->loginIfRequested();
+            $this->outputLoginFormIfNotAuthorized();
+            $this->executeSpecificStep();
+            $this->outputSpecificStep();
+            $this->redirectToTool();
+        }
+    }
+
+    public function isExecutedEnvironmentAndFolders() {
+        $environmentAndFoldersClass = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Controller\Action\Step\EnvironmentAndFolders::class);
+        if ($environmentAndFoldersClass->needsExecution()) {
+            $executed = $this->executeOrOutputFirstInstallStep();
+        } else {
+            $executed = true;
+        }
+        return $executed;
     }
 
     /**
@@ -251,21 +262,18 @@ class StepController extends AbstractController
      */
     protected function executeOrOutputFirstInstallStepIfNeeded()
     {
-//        $postValues = $this->getPostValues();
+        $postValues = $this->getPostValues();
 
-        $wasExecuted = true;
-//            $errorMessagesFromExecute = [];
-//        if (isset($postValues['action'])
-//            && $postValues['action'] === 'environmentAndFolders'
-//            && !@is_dir(PATH_typo3conf)
-//        ) {
-//            /** @var \TYPO3\CMS\Install\Controller\Action\Step\StepInterface $action */
-//            $action = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Controller\Action\Step\EnvironmentAndFolders::class);
-//            $errorMessagesFromExecute = $action->execute();
-//            \TYPO3\CMS\Extbase\Utility\DebuggerUtility::var_dump(!@is_dir(PATH_typo3conf),'StepController:274');
-//            
-//            $wasExecuted = true;
-//        }
+        $wasExecuted = false;
+        $errorMessagesFromExecute = [];
+        if (isset($postValues['action'])
+            && $postValues['action'] === 'environmentAndFolders'
+        ) {
+            /** @var \TYPO3\CMS\Install\Controller\Action\Step\StepInterface $action */
+            $action = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Controller\Action\Step\EnvironmentAndFolders::class);
+            $errorMessagesFromExecute = $action->execute();
+            $wasExecuted = true;
+        }
 
         /** @var \TYPO3\CMS\Install\Controller\Action\Step\StepInterface $action */
         $action = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Controller\Action\Step\EnvironmentAndFolders::class);
@@ -282,7 +290,6 @@ class StepController extends AbstractController
         if (!@is_dir(PATH_typo3conf) || $needsExecution) {
             /** @var \TYPO3\CMS\Install\Controller\Action\Step\StepInterface $action */
             $action = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Controller\Action\Step\EnvironmentAndFolders::class);
-            $errorMessagesFromExecute = $action->execute();
             if ($this->isInitialInstallationInProgress()) {
                 $currentStep = (array_search('environmentAndFolders', $this->authenticationActions) + 1);
                 $totalSteps = count($this->authenticationActions);
@@ -290,18 +297,47 @@ class StepController extends AbstractController
             }
             $action->setController('step');
             $action->setAction('environmentAndFolders');
-            $action->setContext($this->getContext());
             if (!empty($errorMessagesFromExecute)) {
                 $action->setMessages($errorMessagesFromExecute);
             }
             $this->output($action->handle());
-
         }
 
         if ($wasExecuted) {
-            return;
-//            $this->redirect();
+            $this->redirect();
         }
+    }
+
+    /**
+     * ...
+     *
+     * @return void
+     */
+    protected function executeOrOutputFirstInstallStep()
+    {
+        $executed = false;
+        if (!@is_dir(PATH_typo3conf)) {
+            $postValues = $this->getPostValues();
+            $errorMessagesFromExecute = [];
+            if (isset($postValues['action'])
+                && $postValues['action'] === 'environmentAndFolders'
+            ) {
+                /** @var \TYPO3\CMS\Install\Controller\Action\Step\StepInterface $action */
+                $action = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Controller\Action\Step\EnvironmentAndFolders::class);
+                $errorMessagesFromExecute = $action->execute();
+                $executed = true;
+            } else {
+                /** @var \TYPO3\CMS\Install\Controller\Action\Step\StepInterface $action */
+                $action = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Controller\Action\Step\EnvironmentAndFolders::class);
+                $action->setController('step');
+                $action->setAction('environmentAndFolders');
+                if (!empty($errorMessagesFromExecute)) {
+                    $action->setMessages($errorMessagesFromExecute);
+                }
+                $this->output($action->handle());
+            }
+        }
+        return $executed;
     }
 
     /**
