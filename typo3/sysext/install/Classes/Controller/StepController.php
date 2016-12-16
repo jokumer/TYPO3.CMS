@@ -62,6 +62,11 @@ class StepController extends AbstractController
         }
     }
 
+    /**
+     * Checks, if environmentAndFolders needs execution and executes if needed.
+     * 
+     * @return bool|void
+     */
     public function isExecutedEnvironmentAndFolders() {
         $environmentAndFoldersClass = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Controller\Action\Step\EnvironmentAndFolders::class);
         if ($environmentAndFoldersClass->needsExecution()) {
