@@ -765,6 +765,11 @@ class DataHandlerHook
 
         // Check prerequisites before start swapping
 
+        // Skip records that have been deleted during the current execution
+        if ($dataHandler->hasDeletedRecord($table, $id)) {
+            return;
+        }
+
         // First, check if we may actually edit the online record
         if (!$dataHandler->checkRecordUpdateAccess($table, $id)) {
             $dataHandler->newlog('Error: You cannot swap versions for a record you do not have access to edit!', 1);
@@ -802,7 +807,7 @@ class DataHandlerHook
             return;
         }
         // Lock file name:
-        $lockFileName = PATH_site . 'typo3temp/var/swap_locking/' . $table . ':' . $id . '.ser';
+        $lockFileName = PATH_site . 'typo3temp/var/swap_locking/' . $table . '_' . $id . '.ser';
         if (@is_file($lockFileName)) {
             $dataHandler->newlog('A swapping lock file was present. Either another swap process is already running or a previous swap process failed. Ask your administrator to handle the situation.', 2);
             return;
@@ -824,7 +829,7 @@ class DataHandlerHook
         }
         // l10n-fields must be kept otherwise the localization
         // will be lost during the publishing
-        if (!isset($GLOBALS['TCA'][$table]['ctrl']['transOrigPointerTable']) && $GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField']) {
+        if ($table !== 'pages_language_overlay' && $GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField']) {
             $keepFields[] = $GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField'];
         }
         // Swap "keepfields"
@@ -964,9 +969,9 @@ class DataHandlerHook
             // Set log entry for live record:
             $propArr = $dataHandler->getRecordPropertiesFromRow($table, $swapVersion);
             if ($propArr['_ORIG_pid'] == -1) {
-                $label = $this->getLanguageService()->sL('LLL:EXT:lang/locallang_tcemain.xlf:version_swap.offline_record_updated');
+                $label = $this->getLanguageService()->sL('LLL:EXT:lang/Resources/Private/Language/locallang_tcemain.xlf:version_swap.offline_record_updated');
             } else {
-                $label = $this->getLanguageService()->sL('LLL:EXT:lang/locallang_tcemain.xlf:version_swap.online_record_updated');
+                $label = $this->getLanguageService()->sL('LLL:EXT:lang/Resources/Private/Language/locallang_tcemain.xlf:version_swap.online_record_updated');
             }
             $theLogId = $dataHandler->log($table, $id, 2, $propArr['pid'], 0, $label, 10, [$propArr['header'], $table . ':' . $id], $propArr['event_pid']);
             $dataHandler->setHistory($table, $id, $theLogId);
@@ -975,9 +980,9 @@ class DataHandlerHook
             // Set log entry for offline record:
             $propArr = $dataHandler->getRecordPropertiesFromRow($table, $curVersion);
             if ($propArr['_ORIG_pid'] == -1) {
-                $label = $this->getLanguageService()->sL('LLL:EXT:lang/locallang_tcemain.xlf:version_swap.offline_record_updated');
+                $label = $this->getLanguageService()->sL('LLL:EXT:lang/Resources/Private/Language/locallang_tcemain.xlf:version_swap.offline_record_updated');
             } else {
-                $label = $this->getLanguageService()->sL('LLL:EXT:lang/locallang_tcemain.xlf:version_swap.online_record_updated');
+                $label = $this->getLanguageService()->sL('LLL:EXT:lang/Resources/Private/Language/locallang_tcemain.xlf:version_swap.online_record_updated');
             }
             $theLogId = $dataHandler->log($table, $swapWith, 2, $propArr['pid'], 0, $label, 10, [$propArr['header'], $table . ':' . $swapWith], $propArr['event_pid']);
             $dataHandler->setHistory($table, $swapWith, $theLogId);

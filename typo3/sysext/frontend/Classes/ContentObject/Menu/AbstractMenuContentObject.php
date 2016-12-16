@@ -1552,6 +1552,13 @@ abstract class AbstractMenuContentObject
      */
     public function link($key, $altTarget = '', $typeOverride = '')
     {
+        $runtimeCache = $this->getRuntimeCache();
+        $cacheId = 'menu-generated-links-' . md5($key . $altTarget . $typeOverride . serialize($this->menuArr[$key]));
+        $runtimeCachedLink = $runtimeCache->get($cacheId);
+        if ($runtimeCachedLink !== false) {
+            return $runtimeCachedLink;
+        }
+
         // Mount points:
         $MP_var = $this->getMPvar($key);
         $MP_params = $MP_var ? '&MP=' . rawurlencode($MP_var) : '';
@@ -1613,13 +1620,14 @@ abstract class AbstractMenuContentObject
             } catch (\Exception $ex) {
             }
             if (!is_array($shortcut)) {
+                $runtimeCache->set($cacheId, []);
                 return [];
             }
             // Only setting url, not target
             $LD['totalURL'] = $this->parent_cObj->typoLink_URL([
                 'parameter' => $shortcut['uid'],
                 'additionalParams' => $addParams . $this->I['val']['additionalParams'] . $menuItem['_ADD_GETVARS'],
-                'linkAccessRestrictedPages' => $this->mconf['showAccessRestrictedPages'] && $this->mconf['showAccessRestrictedPages'] !== 'NONE'
+                'linkAccessRestrictedPages' => !empty($this->mconf['showAccessRestrictedPages'])
             ]);
         }
         if ($shortcut) {
@@ -1680,6 +1688,7 @@ abstract class AbstractMenuContentObject
         $list['HREF'] = (string)$LD['totalURL'] !== '' ? $LD['totalURL'] : $tsfe->baseUrl;
         $list['TARGET'] = $LD['target'];
         $list['onClick'] = $onClick;
+        $runtimeCache->set($cacheId, $list);
         return $list;
     }
 
@@ -1869,6 +1878,12 @@ abstract class AbstractMenuContentObject
      */
     public function isSubMenu($uid)
     {
+        $cacheId = 'menucontentobject-is-submenu-decision-' . $uid;
+        $runtimeCache = $this->getRuntimeCache();
+        $cachedDecision = $runtimeCache->get($cacheId);
+        if (isset($cachedDecision['result'])) {
+            return $cachedDecision['result'];
+        }
         // Looking for a mount-pid for this UID since if that
         // exists we should look for a subpages THERE and not in the input $uid;
         $mount_info = $this->sys_page->getMountPointInfo($uid);
@@ -1906,6 +1921,7 @@ abstract class AbstractMenuContentObject
             $hasSubPages = true;
             break;
         }
+        $runtimeCache->set($cacheId, ['result' => $hasSubPages]);
         return $hasSubPages;
     }
 
@@ -2112,7 +2128,7 @@ abstract class AbstractMenuContentObject
         if ($page['sectionIndex_uid']) {
             $conf['section'] = $page['sectionIndex_uid'];
         }
-        $conf['linkAccessRestrictedPages'] = $this->mconf['showAccessRestrictedPages'] && $this->mconf['showAccessRestrictedPages'] !== 'NONE';
+        $conf['linkAccessRestrictedPages'] = !empty($this->mconf['showAccessRestrictedPages']);
         $this->parent_cObj->typoLink('|', $conf);
         $LD = $this->parent_cObj->lastTypoLinkLD;
         $LD['totalURL'] = $this->parent_cObj->lastTypoLinkUrl;
@@ -2238,6 +2254,14 @@ abstract class AbstractMenuContentObject
     protected function getCache()
     {
         return GeneralUtility::makeInstance(CacheManager::class)->getCache('cache_hash');
+    }
+
+    /**
+     * @return \TYPO3\CMS\Core\Cache\Frontend\FrontendInterface
+     */
+    protected function getRuntimeCache()
+    {
+        return GeneralUtility::makeInstance(CacheManager::class)->getCache('cache_runtime');
     }
 
     /**

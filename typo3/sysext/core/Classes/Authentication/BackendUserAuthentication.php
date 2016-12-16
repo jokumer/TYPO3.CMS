@@ -252,7 +252,8 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
      * Session timeout (on the server)
      *
      * If >0: session-timeout in seconds.
-     * If 0: no timeout.
+     * If <=0: Instant logout after login.
+     * The value must be at least 180 to avoid side effects.
      *
      * @var int
      */
@@ -699,9 +700,9 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
     public function checkFullLanguagesAccess($table, $record)
     {
         $recordLocalizationAccess = $this->checkLanguageAccess(0);
-        if ($recordLocalizationAccess && (BackendUtility::isTableLocalizable($table) || isset($GLOBALS['TCA'][$table]['ctrl']['transForeignTable']))) {
-            if (isset($GLOBALS['TCA'][$table]['ctrl']['transForeignTable'])) {
-                $l10nTable = $GLOBALS['TCA'][$table]['ctrl']['transForeignTable'];
+        if ($recordLocalizationAccess && (BackendUtility::isTableLocalizable($table) || $table === 'pages')) {
+            if ($table === 'pages') {
+                $l10nTable = 'pages_language_overlay';
                 $pointerField = $GLOBALS['TCA'][$l10nTable]['ctrl']['transOrigPointerField'];
                 $pointerValue = $record['uid'];
             } else {
@@ -779,7 +780,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
                 return false;
             }
         } elseif (
-            isset($GLOBALS['TCA'][$table]['ctrl']['transForeignTable']) && $checkFullLanguageAccess &&
+            $table === 'pages' && $checkFullLanguageAccess &&
             !$this->checkFullLanguagesAccess($table, $idOrRow)
         ) {
             return false;

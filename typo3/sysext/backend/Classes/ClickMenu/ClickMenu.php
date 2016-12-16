@@ -229,7 +229,7 @@ class ClickMenu
         // Used to hide cut,copy icons for l10n-records
         $l10nOverlay = false;
         // Should only be performed for overlay-records within the same table
-        if (BackendUtility::isTableLocalizable($table) && !isset($GLOBALS['TCA'][$table]['ctrl']['transOrigPointerTable'])) {
+        if (BackendUtility::isTableLocalizable($table) && $table !== 'pages_language_overlay') {
             $l10nOverlay = (int)$this->rec[$GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField']] != 0;
         }
         // If record found (or root), go ahead and fill the $menuItems array which will contain data for the elements to render.
@@ -538,10 +538,10 @@ class ClickMenu
             . $this->frameLocation($loc . '.document') . '.search);';
 
         if ($this->backendUser->jsConfirmation(JsConfirmation::COPY_MOVE_PASTE)) {
-            $title = $this->languageService->sL('LLL:EXT:lang/locallang_mod_web_list.xlf:clip_paste');
+            $title = $this->languageService->sL('LLL:EXT:lang/Resources/Private/Language/locallang_mod_web_list.xlf:clip_paste');
             $lllKey = ($elInfo[2] === 'copy' ? 'copy' : 'move') . '_' . $type;
             $confirmMessage = sprintf(
-                $this->languageService->sL('LLL:EXT:lang/locallang_core.xlf:mess.' . $lllKey),
+                $this->languageService->sL('LLL:EXT:lang/Resources/Private/Language/locallang_core.xlf:mess.' . $lllKey),
                 $elInfo[0],
                 $elInfo[1]
             );
@@ -640,7 +640,7 @@ class ClickMenu
         $urlParams = [];
         $urlParams['id'] = $table === 'pages' ? $uid : $rec['pid'];
         $urlParams['table'] = $table === 'pages' ? '' : $table;
-        $url = BackendUtility::getModuleUrl('web_list', $urlParams, '', true);
+        $url = BackendUtility::getModuleUrl('web_list', $urlParams);
         return $this->linkItem(
             htmlspecialchars($this->languageService->getLL('CM_db_list')),
             $this->iconFactory->getIcon('actions-system-list-open', Icon::SIZE_SMALL)->render(),
@@ -797,7 +797,7 @@ class ClickMenu
      *
      * @param string $table Table name
      * @param int $uid UID for the current record.
-     * @param array $elInfo Label for including in the confirmation message, EXT:lang/locallang_core.xlf:mess.delete
+     * @param array $elInfo Label for including in the confirmation message, EXT:lang/Resources/Private/Language/locallang_core.xlf:mess.delete
      * @return array Item array, element in $menuItems
      * @internal
      */
@@ -817,20 +817,20 @@ class ClickMenu
         }
 
         if ($this->backendUser->jsConfirmation(JsConfirmation::DELETE)) {
-            $title = $this->languageService->sL('LLL:EXT:lang/locallang_mod_web_list.xlf:delete');
+            $title = $this->languageService->sL('LLL:EXT:lang/Resources/Private/Language/locallang_mod_web_list.xlf:delete');
             $confirmMessage = sprintf(
-                $this->languageService->sL('LLL:EXT:lang/locallang_core.xlf:mess.delete'),
+                $this->languageService->sL('LLL:EXT:lang/Resources/Private/Language/locallang_core.xlf:mess.delete'),
                 $elInfo[0]
             );
             $confirmMessage .= BackendUtility::referenceCount(
                 $table,
                 $uid,
-                ' ' . $this->languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.referencesToRecord')
+                ' ' . $this->languageService->sL('LLL:EXT:lang/Resources/Private/Language/locallang_core.xlf:labels.referencesToRecord')
             );
             $confirmMessage .= BackendUtility::translationCount(
                 $table,
                 $uid,
-                ' ' . $this->languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.translationsOfRecord')
+                ' ' . $this->languageService->sL('LLL:EXT:lang/Resources/Private/Language/locallang_core.xlf:labels.translationsOfRecord')
             );
             $jsCode = 'top.TYPO3.Modal.confirm(' . GeneralUtility::quoteJSvalue($title) . ', '
                 . GeneralUtility::quoteJSvalue($confirmMessage) . ')'
@@ -1144,15 +1144,15 @@ class ClickMenu
             );
         if ($this->backendUser->jsConfirmation(JsConfirmation::DELETE)) {
             $fileOrFolderObject = ResourceFactory::getInstance()->retrieveFileOrFolderObject($path);
-            $title = $this->languageService->sL('LLL:EXT:lang/locallang_mod_web_list.xlf:delete');
+            $title = $this->languageService->sL('LLL:EXT:lang/Resources/Private/Language/locallang_mod_web_list.xlf:delete');
             $confirmMessage = sprintf(
-                $this->languageService->sL('LLL:EXT:lang/locallang_core.xlf:mess.delete'),
+                $this->languageService->sL('LLL:EXT:lang/Resources/Private/Language/locallang_core.xlf:mess.delete'),
                 $fileOrFolderObject->getName()
             );
             if ($fileOrFolderObject instanceof Folder) {
-                $confirmMessage .= BackendUtility::referenceCount('_FILE', $fileOrFolderObject->getIdentifier(), ' ' . $this->languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.referencesToFolder'));
+                $confirmMessage .= BackendUtility::referenceCount('_FILE', $fileOrFolderObject->getIdentifier(), ' ' . $this->languageService->sL('LLL:EXT:lang/Resources/Private/Language/locallang_core.xlf:labels.referencesToFolder'));
             } else {
-                $confirmMessage .= BackendUtility::referenceCount('sys_file', $fileOrFolderObject->getUid(), ' ' . $this->languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.referencesToFile'));
+                $confirmMessage .= BackendUtility::referenceCount('sys_file', $fileOrFolderObject->getUid(), ' ' . $this->languageService->sL('LLL:EXT:lang/Resources/Private/Language/locallang_core.xlf:labels.referencesToFile'));
             }
             $jsCode = 'top.TYPO3.Modal.confirm(' . GeneralUtility::quoteJSvalue($title) . ', '
                 . GeneralUtility::quoteJSvalue($confirmMessage) . ')'
@@ -1187,10 +1187,10 @@ class ClickMenu
             . '.pathname+' . $this->frameLocation($loc . '.document') . '.search); top.nav.refresh();';
 
         if ($this->backendUser->jsConfirmation(JsConfirmation::COPY_MOVE_PASTE)) {
-            $title = $this->languageService->sL('LLL:EXT:lang/locallang_mod_web_list.xlf:clip_paste');
+            $title = $this->languageService->sL('LLL:EXT:lang/Resources/Private/Language/locallang_mod_web_list.xlf:clip_paste');
 
             $confirmMessage = sprintf(
-                $this->languageService->sL('LLL:EXT:lang/locallang_core.xlf:mess.'
+                $this->languageService->sL('LLL:EXT:lang/Resources/Private/Language/locallang_core.xlf:mess.'
                     . ($elInfo[2] === 'copy' ? 'copy' : 'move') . '_into'),
                 $elInfo[0],
                 $elInfo[1]
@@ -1582,7 +1582,7 @@ class ClickMenu
      */
     public function label($label)
     {
-        return htmlspecialchars($this->languageService->sL('LLL:EXT:lang/locallang_core.xlf:cm.' . $label));
+        return htmlspecialchars($this->languageService->sL('LLL:EXT:lang/Resources/Private/Language/locallang_core.xlf:cm.' . $label));
     }
 
     /**

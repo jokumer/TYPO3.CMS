@@ -42,7 +42,7 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
      * Session timeout (on the server)
      *
      * If >0: session-timeout in seconds.
-     * If 0: no timeout.
+     * If <=0: Instant logout after login.
      *
      * @var int
      */
@@ -154,6 +154,9 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
         $this->sendNoCacheHeaders = false;
         $this->getFallBack = true;
         $this->getMethodEnabled = true;
+        $this->lockIP = $GLOBALS['TYPO3_CONF_VARS']['FE']['lockIP'];
+        $this->checkPid = $GLOBALS['TYPO3_CONF_VARS']['FE']['checkFeUserPid'];
+        $this->lifetime = (int)$GLOBALS['TYPO3_CONF_VARS']['FE']['lifetime'];
     }
 
     /**

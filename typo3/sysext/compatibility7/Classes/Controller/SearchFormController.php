@@ -19,6 +19,7 @@ use TYPO3\CMS\Core\Html\HtmlParser;
 use TYPO3\CMS\Core\TimeTracker\TimeTracker;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
+use TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController;
 use TYPO3\CMS\IndexedSearch\Utility;
 
 /**
@@ -340,9 +341,9 @@ class SearchFormController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
         }
         // Add operators for various languages
         // Converts the operators to lowercase
-        $this->operator_translate_table[] = [$this->charsetConverter->conv_case('utf-8', $this->pi_getLL('local_operator_AND'), 'toLower'), 'AND'];
-        $this->operator_translate_table[] = [$this->charsetConverter->conv_case('utf-8', $this->pi_getLL('local_operator_OR'), 'toLower'), 'OR'];
-        $this->operator_translate_table[] = [$this->charsetConverter->conv_case('utf-8', $this->pi_getLL('local_operator_NOT'), 'toLower'), 'AND NOT'];
+        $this->operator_translate_table[] = [mb_strtolower($this->pi_getLL('local_operator_AND'), 'utf-8'), 'AND'];
+        $this->operator_translate_table[] = [mb_strtolower($this->pi_getLL('local_operator_OR'), 'utf-8'), 'OR'];
+        $this->operator_translate_table[] = [mb_strtolower($this->pi_getLL('local_operator_NOT'), 'utf-8'), 'AND NOT'];
         // This is the id of the site root. This value may be a commalist of integer (prepared for this)
         $this->wholeSiteIdList = (int)$this->frontendController->config['rootLine'][0]['uid'];
         // Creating levels for section menu:
@@ -375,7 +376,10 @@ class SearchFormController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
             $this->wholeSiteIdList = implode(',', GeneralUtility::intExplode(',', $this->conf['search.']['rootPidList']));
         }
         // Load the template
-        $this->templateCode = $this->cObj->fileResource($this->conf['templateFile']);
+        $template = $this->getTypoScriptFrontendController()->tmpl->getFileName($this->conf['templateFile']);
+        if ($template !== null && file_exists($template)) {
+            $this->templateCode = file_get_contents($template);
+        }
         // Add search languages:
         $res = $this->databaseConnection->exec_SELECTquery('*', 'sys_language', '1=1' . $this->cObj->enableFields('sys_language'));
         while (false !== ($data = $this->databaseConnection->sql_fetch_assoc($res))) {
@@ -2173,7 +2177,7 @@ class SearchFormController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
         foreach ($parts as $k => $strP) {
             if ($k % 2 == 0) {
                 // Find length of the summary part:
-                $strLen = $this->charsetConverter->strlen('utf-8', $parts[$k]);
+                $strLen = mb_strlen($parts[$k], 'utf-8');
                 $output[$k] = $parts[$k];
                 // Possibly shorten string:
                 if (!$k) {
@@ -2192,7 +2196,7 @@ class SearchFormController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                         $output[$k] = preg_replace('/[[:space:]][^[:space:]]+$/', '', $this->charsetConverter->crop('utf-8', $parts[$k], ($postPreLgd - $postPreLgd_offset))) . $divider . preg_replace('/^[^[:space:]]+[[:space:]]/', '', $this->charsetConverter->crop('utf-8', $parts[$k], -($postPreLgd - $postPreLgd_offset)));
                     }
                 }
-                $summaryLgd += $this->charsetConverter->strlen('utf-8', $output[$k]);
+                $summaryLgd += mb_strlen($output[$k], 'utf-8');
                 // Protect output:
                 $output[$k] = htmlspecialchars($output[$k]);
                 // If summary lgd is exceed, break the process:
@@ -2200,7 +2204,7 @@ class SearchFormController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                     break;
                 }
             } else {
-                $summaryLgd += $this->charsetConverter->strlen('utf-8', $strP);
+                $summaryLgd += mb_strlen($strP, 'utf-8');
                 $output[$k] = '<strong class="tx-indexedsearch-redMarkup">' . htmlspecialchars($parts[$k]) . '</strong>';
             }
         }
@@ -2654,5 +2658,15 @@ class SearchFormController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
             10, 400, 60
         );
         $this->conf['results.']['hrefInSummaryCropSignifier'] = $this->cObj->stdWrap($this->conf['results.']['hrefInSummaryCropSignifier'], $this->conf['results.']['hrefInSummaryCropSignifier.']);
+    }
+
+    /**
+     * Get TypoScriptFrontendController
+     *
+     * @return TypoScriptFrontendController
+     */
+    protected function getTypoScriptFrontendController()
+    {
+        return $GLOBALS['TSFE'];
     }
 }

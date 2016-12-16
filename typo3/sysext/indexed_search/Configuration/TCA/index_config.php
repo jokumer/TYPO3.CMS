@@ -22,14 +22,14 @@ return [
     ],
     'columns' => [
         'hidden' => [
-            'label' => 'LLL:EXT:lang/locallang_general.xlf:LGL.disable',
+            'label' => 'LLL:EXT:lang/Resources/Private/Language/locallang_general.xlf:LGL.disable',
             'config' => [
                 'type' => 'check',
                 'default' => '1'
             ]
         ],
         'starttime' => [
-            'label' => 'LLL:EXT:lang/locallang_general.xlf:LGL.starttime',
+            'label' => 'LLL:EXT:lang/Resources/Private/Language/locallang_general.xlf:LGL.starttime',
             'config' => [
                 'type' => 'input',
                 'size' => 8,
@@ -77,11 +77,11 @@ return [
                 'type' => 'select',
                 'renderType' => 'selectSingle',
                 'items' => [
-                    ['LLL:EXT:lang/locallang_core.xlf:labels.depth_0', '0'],
-                    ['LLL:EXT:lang/locallang_core.xlf:labels.depth_1', '1'],
-                    ['LLL:EXT:lang/locallang_core.xlf:labels.depth_2', '2'],
-                    ['LLL:EXT:lang/locallang_core.xlf:labels.depth_3', '3'],
-                    ['LLL:EXT:lang/locallang_core.xlf:labels.depth_4', '4']
+                    ['LLL:EXT:lang/Resources/Private/Language/locallang_core.xlf:labels.depth_0', '0'],
+                    ['LLL:EXT:lang/Resources/Private/Language/locallang_core.xlf:labels.depth_1', '1'],
+                    ['LLL:EXT:lang/Resources/Private/Language/locallang_core.xlf:labels.depth_2', '2'],
+                    ['LLL:EXT:lang/Resources/Private/Language/locallang_core.xlf:labels.depth_3', '3'],
+                    ['LLL:EXT:lang/Resources/Private/Language/locallang_core.xlf:labels.depth_4', '4']
                 ],
                 'size' => 1,
                 'maxitems' => 1
@@ -241,27 +241,70 @@ return [
     ],
     'types' => [
         '0' => [
-            'showitem' => 'title, --palette--;;1, description, timer_next_indexing, timer_offset, timer_frequency, set_id, type',
+            'showitem' => '
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:general,
+                    type,title,timer_next_indexing, timer_offset, timer_frequency, set_id,
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:access,
+                    hidden,starttime,
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:notes,
+                    description,
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:extended,
+            ',
         ],
         '1' => [
-            'showitem' => 'title, --palette--;;1, description, timer_next_indexing, timer_offset, timer_frequency, set_id, type, table2index, alternative_source_pid, fieldlist, get_params, chashcalc,recordsbatch,records_indexonchange',
+            'showitem' => '
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:general,
+                    type,title,timer_next_indexing, timer_offset, timer_frequency, set_id, table2index, alternative_source_pid, fieldlist, get_params, chashcalc,recordsbatch,records_indexonchange,
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:access,
+                    hidden,starttime,
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:notes,
+                    description,
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:extended,
+            ',
         ],
         '2' => [
-            'showitem' => 'title, --palette--;;1, description, timer_next_indexing, timer_offset, timer_frequency, set_id, type, filepath, extensions, depth',
+            'showitem' => '
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:general,
+                    type,title,timer_next_indexing, timer_offset, timer_frequency, set_id, filepath, extensions, depth,
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:access,
+                    hidden,starttime,
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:notes,
+                    description,
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:extended,
+            ',
         ],
         '3' => [
-            'showitem' => 'title, --palette--;;1, timer_next_indexing, timer_offset, timer_frequency, set_id, type, externalUrl, depth, url_deny',
+            'showitem' => '
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:general,
+                    type, title, timer_next_indexing, timer_offset, timer_frequency, set_id, externalUrl, depth, url_deny,
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:access,
+                    hidden,starttime,
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:notes,
+                    description,
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:extended,
+            ',
         ],
         '4' => [
-            'showitem' => 'title, --palette--;;1, description, timer_next_indexing, timer_offset, timer_frequency, set_id, type, alternative_source_pid;LLL:EXT:indexed_search/Resources/Private/Language/locallang_db.xlf:index_config.rootpage, depth',
+            'showitem' => '
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:general,
+                    type,title,timer_next_indexing, timer_offset, timer_frequency, set_id, alternative_source_pid;LLL:EXT:indexed_search/Resources/Private/Language/locallang_db.xlf:index_config.rootpage, depth,
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:access,
+                    hidden,starttime,
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:notes,
+                    description,
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:extended,
+            ',
         ],
         '5' => [
-            'showitem' => 'title, description, type, indexcfgs',
-        ],
-    ],
-    'palettes' => [
-        '1' => [
-            'showitem' => 'starttime, hidden',
+            'showitem' => '
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:general,
+                    type,title,indexcfgs,
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:access,
+                    hidden,starttime,
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:notes,
+                    description,
+                --div--;LLL:EXT:core/Resources/Private/Language/Form/locallang_tabs.xlf:extended,
+            ',
         ],
     ],
 ];
