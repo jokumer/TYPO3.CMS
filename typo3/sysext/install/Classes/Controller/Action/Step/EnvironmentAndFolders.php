@@ -72,6 +72,7 @@ class EnvironmentAndFolders extends AbstractStepAction
             $installToolService = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Service\EnableFileService::class);
             $installToolService->removeFirstInstallFile();
             $installToolService->createInstallToolEnableFile();
+            $this->markStepAsDone('environmentAndFolders');
         }
 
         return $errorsFromStructure;
@@ -121,9 +122,7 @@ class EnvironmentAndFolders extends AbstractStepAction
 
         if (!empty($environmentStatus['error']) || !empty($environmentStatus['warning']) || !empty($structureErrors)) {
             $this->view->assign('errorsOrWarningsFromStatus', true);
-        } else {
-            $this->markStepAsDone('environmentAndFolders');
-        }
+        } 
         $this->assignSteps();
 
         return $this->view->render();

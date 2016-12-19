@@ -127,7 +127,8 @@ abstract class AbstractStepAction extends \TYPO3\CMS\Install\Controller\Action\A
     {
         if ($stepAction !== '') {
             $configurationValues = ['INSTALL/stepDone/' . $stepAction => $confValue];
-            $configurationManager = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Configuration\ConfigurationManager::class);
+            /** @var \TYPO3\CMS\Core\Configuration\ConfigurationManager $configurationManager */
+            $configurationManager = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Core\Configuration\ConfigurationManager::class);
             $configurationManager->setLocalConfigurationValuesByPathValuePairs($configurationValues);
         }
     }

@@ -135,6 +135,8 @@ class DatabaseConnect extends AbstractStepAction
                 $errorStatus->setTitle('Database connect not successful');
                 $errorStatus->setMessage('Connecting to the database with given settings failed. Please check.');
                 $result[] = $errorStatus;
+            } else {
+                $this->markStepAsDone('databaseConnect');
             }
         }
 

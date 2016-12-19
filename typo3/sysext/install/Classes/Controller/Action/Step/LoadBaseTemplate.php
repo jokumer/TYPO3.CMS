@@ -61,7 +61,7 @@ class LoadBaseTemplate extends AbstractStepAction
             $steps = $configurationManager->getLocalConfigurationValueByPath('INSTALL/stepDone');
             
             if(count($steps) > 0 ) {
-                end($steps);         
+//                end($steps);
                 $lastSuccessfulStep = key($steps);
             } else {
                 $lastSuccessfulStep = 'loadBaseTemplate';    

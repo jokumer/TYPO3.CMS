@@ -48,12 +48,16 @@ class DatabaseSelect extends AbstractStepAction
 
             if ($status instanceof ErrorStatus) {
                 return [ $status ];
+            } else {
+                $this->markStepAsDone('databaseSelect');
             }
         } elseif ($postValues['type'] === 'existing' && !empty($postValues['existing'])) {
             $status = $this->checkExistingDatabase($postValues['existing']);
 
             if ($status instanceof ErrorStatus) {
                 return [ $status ];
+            } else {
+                $this->markStepAsDone('databaseSelect');
             }
         } else {
             $errorStatus = GeneralUtility::makeInstance(ErrorStatus::class);
