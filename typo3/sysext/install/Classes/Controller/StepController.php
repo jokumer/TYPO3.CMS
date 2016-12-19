@@ -47,6 +47,11 @@ class StepController extends AbstractController
         $this->loadBaseExtensions();
         $this->outputInstallToolNotEnabledMessageIfNeeded();
         $this->outputInstallToolPasswordNotSetMessageIfNeeded();
+        
+        if(empty($_REQUEST)){
+            $this->loadBaseTemplate();
+        }
+
         if ($this->isExecutedEnvironmentAndFolders()) {
             $this->recreatePackageStatesFileIfNotExisting();
             $this->adjustTrustedHostsPatternIfNeeded();
@@ -62,6 +67,18 @@ class StepController extends AbstractController
         }
     }
 
+    /**
+     * Loads basetemplate at first, independed of the step which needs to be executed next
+     *
+     * @return bool|void
+     */
+    public function loadBaseTemplate() {
+        $action = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Controller\Action\Step\LoadBaseTemplate::class);
+        $action->setController('step');
+        $action->setAction('loadBaseTemplate');
+        $this->output($action->handle());
+    }
+    
     /**
      * Checks, if environmentAndFolders needs execution and executes if needed.
      * 
@@ -295,6 +312,7 @@ class StepController extends AbstractController
         if (!@is_dir(PATH_typo3conf) || $needsExecution) {
             /** @var \TYPO3\CMS\Install\Controller\Action\Step\StepInterface $action */
             $action = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Controller\Action\Step\EnvironmentAndFolders::class);
+          
             if ($this->isInitialInstallationInProgress()) {
                 $currentStep = (array_search('environmentAndFolders', $this->authenticationActions) + 1);
                 $totalSteps = count($this->authenticationActions);
