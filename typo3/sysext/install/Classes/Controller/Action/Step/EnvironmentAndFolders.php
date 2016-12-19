@@ -121,6 +121,8 @@ class EnvironmentAndFolders extends AbstractStepAction
 
         if (!empty($environmentStatus['error']) || !empty($environmentStatus['warning']) || !empty($structureErrors)) {
             $this->view->assign('errorsOrWarningsFromStatus', true);
+        } else {
+            $this->markStepAsDone('environmentAndFolders');
         }
         $this->assignSteps();
 

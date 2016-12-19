@@ -113,4 +113,22 @@ abstract class AbstractStepAction extends \TYPO3\CMS\Install\Controller\Action\A
         $this->view->assign('steps', $steps);
         $this->view->assign('currentStep', $steps[$currentStep-1]);
     }
+
+    /**
+     * Marks step as being "done" so that it not shown again.
+     *
+     * Writes the info in LocalConfiguration.php
+     *
+     * @param string $stepName The install step
+     * @param mixed $confValue The configuration is set to this value
+     * @return void
+     */
+    public function markStepAsDone($stepAction = '', $confValue = 1)
+    {
+        if ($stepAction !== '') {
+            $configurationValues = ['INSTALL/stepDone/' . $stepAction => $confValue];
+            $configurationManager = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Configuration\ConfigurationManager::class);
+            $configurationManager->setLocalConfigurationValuesByPathValuePairs($configurationValues);
+        }
+    }
 }

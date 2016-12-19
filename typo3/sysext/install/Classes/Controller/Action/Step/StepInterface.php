@@ -65,4 +65,15 @@ interface StepInterface
      * @return int
      */
     public function getTotalSteps();
+
+    /**
+     * Marks step as being "done" so that it not shown again.
+     *
+     * Writes the info in LocalConfiguration.php
+     *
+     * @param string $stepName The install step
+     * @param mixed $confValue The configuration is set to this value
+     * @return void
+     */
+    public function markStepAsDone($stepAction = '', $confValue = 1);
 }
