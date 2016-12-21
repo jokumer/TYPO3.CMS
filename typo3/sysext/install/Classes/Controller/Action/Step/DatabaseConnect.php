@@ -171,12 +171,6 @@ class DatabaseConnect extends AbstractStepAction
      */
     protected function executeAction()
     {
-
-        
-        /*
-         * todo: "qualifiziertes raten" von MySql-Zugängen (my.cnf und .env), anbieten von gefundenen user-pw kombinationen und option neue zu adden sowie Datanebanken finden etc.
-         *
-         * */
         $this->view
             ->assign('username', $this->getConfiguredUsername())
             ->assign('password', $this->getConfiguredPassword())
