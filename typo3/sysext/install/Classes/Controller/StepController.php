@@ -376,7 +376,6 @@ class StepController extends AbstractController
         $configurationManager = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Configuration\ConfigurationManager::class);
         $configurationManager->setLocalConfigurationValueByPath('SYS/trustedHostsPattern', '.*');
         return;
-//        $this->redirect();
     }
 
     /**
@@ -391,7 +390,6 @@ class StepController extends AbstractController
         try {
             $upgradeService->execute();
         } catch (Exception\RedirectException $e) {
-//            $this->redirect();
             return;
         }
     }
