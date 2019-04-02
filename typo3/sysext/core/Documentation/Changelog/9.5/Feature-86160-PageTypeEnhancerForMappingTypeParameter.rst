@@ -78,4 +78,23 @@ Please note that the implementation is a Decorator Enhancer, which means that th
 is only there for adding suffixes to an existing route / variant, but not to substitute something
 within the middle of a speaking URL segment.
 
+Important
+=========
+
+If you configure routeEnhancer for a single page type, it is necessary that you also add all page
+types, which are used in your TYPO3 installation (e.g. fluidAjaxWidgetResponse or EXT:yoast).
+
+.. code-block:: yaml
+
+   routeEnhancers:
+      PageTypeSuffix:
+         type: PageType
+         default: '.json'
+         index: 'index'
+         map:
+            'rss.feed': 13
+            '.json': 26
+            'fluidajaxwidgetresponse': '7076'
+            'yoastseopreview': '1480321830'
+
 .. index:: Frontend
